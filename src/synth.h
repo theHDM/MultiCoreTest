@@ -6,14 +6,24 @@
 #include <array>
 #include <vector>
 
-/*
-  These definitions provide 8-bit samples to emulate.
-  You can add your own as desired; it must
-  be an array of 256 values, each from 0 to 255.
-  Ideally the waveform is normalized so that the
-  peaks are at 0 to 255, with 127 representing
-  no wave movement.
-*/
+
+queue_t open_synth_channel_queue;
+
+void reset_synth_channel_queue() {
+  uint8_t discard;
+  while (!queue_is_empty(&open_synth_channel_queue)) {
+    queue_try_remove(&open_synth_channel_queue, &discard);
+  }
+  uint8_t i = 1;
+  while (i <= synth_polyphony_limit) {
+    i += queue_try_add(&open_synth_channel_queue, &i);
+  }
+}
+
+void initialize_synth_channel_queue() {
+  queue_init(&open_synth_channel_queue, sizeof(uint8_t), synth_polyphony_limit);
+  reset_synth_channel_queue();
+}
 
 int8_t sine8[] =
   {   0,   3,   6,   9,  12,  16,  19,  22,  25,  28,  31,  34,  37,  40,  43,  46
@@ -44,9 +54,75 @@ struct Hybrid_Parameters {
   uint8_t a;
   uint8_t b;
   uint8_t c;
+  uint8_t d_minus_one;
   uint16_t ab;
   uint16_t cd;
 };
+
+enum {
+  wave_shape_hybrid   = 0;
+  wave_shape_square   = 1;
+  wave_shape_saw      = 2;
+  wave_shape_triangle = 3;
+};
+
+const float hybrid_transition_square   =  220.f;
+const float hybrid_transition_saw_low  =  440.f;
+const float hybrid_transition_saw_high =  880.f;
+const float hybrid_transition_triangle = 1760.f;
+
+void calculate_hybrid_params(
+  Hybrid_Parameters& param,
+  double& freq,
+  uint8_t& shape_type,
+  uint8_t& modulation) {
+
+  uint8_t model_shape = shape_type;
+  float transition_pct = 0.f;
+  if (shape_type == wave_shape_hybrid) {
+    if (freq < hybrid_transition_saw_low) {
+      model_shape = wave_shape_square;
+      if (freq > hybrid_transition_square) {
+        transition_pct =  (freq - transition_square) 
+          / (transition_saw_low - transition_square);
+      }
+    } else if (freq > hybrid_transition_saw_high) {
+      model_shape = wave_shape_triangle;
+      if (freq < hybrid_transition_triangle) {
+        transition_pct = 
+            (transition_triangle - freq) 
+          / (transition_triangle - transition_saiangle);
+      }
+    } else {
+      model_shape = wave_shape_saw;
+    }
+  }
+  uint8_t duty_cycle = 127 - modulation;
+  switch (model_shape) {
+    case wave_shape_square: {
+      param.a = (duty_cycle * (1.f - transition_pct)) - 1;
+      param.b = (duty_cycle * (1.f + transition_pct));
+      param.c = (duty_cycle << 1) - 1;
+      param.d_minus_one = param.c;
+    }
+    case wave_shape_saw: {
+      param.a =  0;
+      param.b = (duty_cycle << 1) - 1;
+      param.c = (duty_cycle << 1) - 1;
+      param.d_minus_one = param.c;
+    }
+    case wave_shape_triangle: {
+      param.a =  0;
+      param.b =  duty_cycle * (2.f - transition_pct);
+      param.c =  param.b;
+      param.d_minus_one = (duty_cycle << 1) - 1;
+    }
+  }
+  param.ab = (param.b == param.a + 1) ? 0 : 65536 / (param.b - 1 - param.a);
+  param.cd = (param.d_minus_one == param.c) 
+      ? 0 : 65536 / (param.d_minus_one - param.c);
+}
+
 
 struct Synth_Generation {
   uint32_t pitch_as_increment;
@@ -77,6 +153,9 @@ enum {
   synth_phase_sustain = 3,
   synth_phase_release = 4
 };
+
+const uint8_t sine_generator = 254;
+const uint8_t hybrid_generator = 255;
 
 struct Synth_Msg {
   uint8_t command;
@@ -121,7 +200,7 @@ struct Synth_Voice {
                                         / generator.envelope.decay);
       release_inverse = ( !generator.envelope.release ? 0 :
                           (1u << 16) / generator.envelope.release);
-      if (generator.waveform_ID = 254) {
+      if (generator.waveform_ID = sine_generator) {
         uint16_t amplitude = 0;
         for (uint8_t h = 0; h < oscillator_harmonic_limit; ++h) {
           generator.harmonics[h] = arg_synth_gen.harmonics[h];
@@ -129,7 +208,7 @@ struct Synth_Voice {
         }
         sine_normalization = (!amplitude ? 0 : 65536 / amplitude);
       }
-      if (generator.waveform_ID = 255) {
+      if (generator.waveform_ID = hybrid_generator) {
         generator.hybrid_params = arg_synth_gen.hybrid_params;
       }
     }
@@ -148,27 +227,32 @@ struct Synth_Voice {
     loop_counter += generator.pitch_as_increment;
     uint16_t sample = 0;
     switch (generator.waveform_ID) {
-      case 254: { 
+      case sine_generator: { 
         uint32_t sine_counter = 0;
         for (uint8_t h = 0; h < oscillator_harmonic_limit; ++h) {
           sine_counter += loop_counter;
           sample += (static_cast<uint16_t>(
             (static_cast<int32_t>(sine8[sine_counter >> 24])
             * generator.harmonics[h])
-            + 32768) >> 8);
+            + (1u << 15)) >> 8);
         }
         sample *= sine_normalization;
         break;
       }
-      case 255: {
+      case hybrid_generator: {
         uint8_t t = (loop_counter >> 24);
-        if (t >  generator.hybrid_params.c) {
-          sample = generator.hybrid_params.cd * (256 - t);
-        } else if (t >= generator.hybrid_params.b) {
-          sample = 65535;
-        } else if (t >  generator.hybrid_params.a) {
-          sample = generator.hybrid_params.ab 
-            * (t - generator.hybrid_params.a);
+        if (t > generator.hybrid_params.a) {
+          if (t < generator.hybrid_params.b) {
+            sample = generator.hybrid_params.ab 
+              * (t - generator.hybrid_params.a);
+          } else if (t > generator.hybrid_params.c) {
+            if (t < generator.hybrid_params.d_minus_one) {
+              sample = generator.hybrid_params.cd 
+              * (1 + (generator.hybrid_params.d_minus_one - t));
+            }
+          } else {
+            sample = 65535;
+          }
         }
         break;
       }
@@ -255,7 +339,7 @@ class hexBoard_Synth_Object {
     void begin() {
       cfg = pwm_get_default_config();
       pwm_config_set_clkdiv(&cfg, 1.0f);
-      pwm_config_set_wrap(&cfg, 254);
+      pwm_config_set_wrap(&cfg, (1u << 8) - 2);
       pwm_config_set_phase_correct(&cfg, true);
       for (size_t i = 0; i < pins.size(); ++i) {
         uint8_t p = pins[i];
@@ -264,6 +348,7 @@ class hexBoard_Synth_Object {
         pwm_init(s, &cfg, true);                // configure and start!
         pwm_set_gpio_level(p, 0);               // initialize at zero to prevent whining sound
       }
+      initialize_synth_channel_queue();
       active = true;
     }
 

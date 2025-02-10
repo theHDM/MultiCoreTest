@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <map>
 #include "hexagon.h"
+#include "music.h"
 
 enum class App_state {  // OLED             LED         Audio        Keys       Knob
   setup,                // splash/status    off         off          off        off
@@ -17,24 +18,21 @@ enum class App_state {  // OLED             LED         Audio        Keys       
 
 /* serialize members with a !! */
 struct Button {
-/*!!*/  bool isUsed = false;  // is it a button or a hardwired circuit
-/*!!*/  int8_t  atMux  = -1;
-/*!!*/  int8_t  atCol  = -1;
+/*!!*/  bool     isUsed = false;  // is it a button or a hardwired circuit
+/*!!*/  int8_t   atMux  = -1;
+/*!!*/  int8_t   atCol  = -1;
+/*!!*/  bool     isBtn  = false;  // is it a button not a hardwired circuit
+/*!!*/  Hex      coord  = {0,0};  // physical location
+/*!!*/  bool     isNote = false;  // is it a music note object
+/*!!*/  bool     isCmd  = false;  // is it a command button
+/*!!*/  int16_t  pixel  = -1;     // the button's index in the grid, which is equal to its associated pixel number if it has one
 
-/*!!*/  bool isBtn  = false; // is it a button as opposed to a hardwired circuit
-/*!!*/  Hex  coord  = {0,0}; // physical location
-
-/*!!*/  bool isNote = false; // is it a music note object
-/*!!*/  bool isCmd  = false;  // is it a command button
-/*!!*/  int16_t  pixel  = -1; // the button's index in the grid, which is equal to its associated pixel number if it has one
-
-/*!!*/  uint32_t LEDcodeBase = 0;     // for now
-/*!!*/  uint32_t LEDcodeAnim = 0;     // calculate it once and store value, to make LED playback snappier 
-/*!!*/  uint32_t LEDcodePlay = 0;     // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeRest = 0;     // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeOff  = 0;      // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeDim  = 0;      // calculate it once and store value, to make LED playback snappier
-                            // gradient rule, to be added
+/*!!*/  uint32_t LEDcodeBase = 0; // for now
+/*!!*/  uint32_t LEDcodeAnim = 0; // calculate it once and store value, to make LED playback snappier 
+/*!!*/  uint32_t LEDcodePlay = 0; // calculate it once and store value, to make LED playback snappier
+/*!!*/  uint32_t LEDcodeRest = 0; // calculate it once and store value, to make LED playback snappier
+/*!!*/  uint32_t LEDcodeOff  = 0; // calculate it once and store value, to make LED playback snappier
+/*!!*/  uint32_t LEDcodeDim  = 0; // calculate it once and store value, to make LED playback snappier
 /*!!*/  double   frequency = 0.0; // equivalent pitch in Hz
 /*!!*/  uint8_t  midiCh = 0;      // what channel assigned (if not MPE mode)   [1..16]
 /*!!*/  uint8_t  midiTuningTable = 255; // assigned MIDI note (if MTS mode) [0..127]
@@ -43,18 +41,15 @@ struct Button {
 /*!!*/  bool     inScale = false; // for scale-lock purposes
 /*!!*/  uint8_t  cmd = 0;  // control parameter corresponding to this hex
 
-  uint8_t midiNote = 0;    // nearest MIDI pitch, 0 to 128
-  int16_t midiBend = 0;    // pitch bend for MPE purposes
-
+  uint8_t  midiNote = 0;    // nearest MIDI pitch, 0 to 128
+  int16_t  midiBend = 0;    // pitch bend for MPE purposes
   uint64_t timeLastUpdate = 0; // store time that key level was last updated
   uint8_t  lastKnownLevel = 0; // press level currently
   uint64_t timePressBegan = 0; // store time that full press occurred
   uint64_t velocityData = 0; // proxy for velocity
-  bool just_pressed_flag = false;
-  bool just_released_flag = false;
-
+  bool     just_pressed_flag = false;
+  bool     just_released_flag = false;
   int8_t   animate = 0; // store value to track animations
-
   uint8_t  midiChPlaying = 0;          // what midi channel is there currrently a note-on
   uint8_t  synthChPlaying = 0;         // what synth channel is there currrently a note-on
 
@@ -86,75 +81,6 @@ struct Button {
 };
 
 
-
-// write to synth midi queue
-// send midi out
-/*
-    start with freq
-    freq *= 2^(pitchbend * pitchbendsemis/(12*8192))
-    freq *= poll _interval/1000000
-    uint32_t interval = lround(ldexp(freq, 32))
-
-      uint8_t iso226(float f) {
-        // a very crude implementation of ISO 226
-        // equal loudness curves
-        //   Hz dB  Amp ~ sqrt(10^(dB/10))
-        //  200  0  8
-        //  800 -3  6   
-        // 1500  0  8
-        // 3250 -6  4
-        // 5000  0  8
-        if (f <      8.0) return 0;
-        if (f <    200.0) return 8;
-        if (f <   1500.0) return 6 + 2 * (float)(abs(f- 800) /  700);
-        if (f <   5000.0) return 4 + 4 * (float)(abs(f-3250) / 1750);
-        if (f < highest_MIDI_note_in_Hz) return 8;
-        return 0;
-      }
-
-    // hybrid algorithm
-    struct Hybrid_Oscillator {
-      // 255 |     B/--\C Hybrid waveforms are defined
-      //     |     /    \   by the location of points
-      //     +----------------- A, B, C, and D
-      //     |   /        \ 
-      //   0 |--/A        D\---
-      uint8_t a;
-      uint8_t b;
-      uint8_t c;
-      uint16_t ab;
-      uint16_t cd;
-      const float hybrid_square   =  220.0;
-      const float hybrid_saw_low  =  440.0;
-      const float hybrid_saw_high =  880.0;
-      const float hybrid_triangle = 1760.0;
-      void update_freq(float f) {
-        if (f > hybrid_square) {
-          b = 128;
-        } else if (f < hybrid_saw_low) {
-          b = 128 + (uint8_t)(127 * (f - hybrid_square) / (hybrid_saw_low - hybrid_square));
-        } else if (f < hybrid_saw_high) {
-          b = 255;
-        } else if (f < hybrid_triangle) {
-          b = 127 + (uint8_t)(128 * (hybrid_triangle - f) / (hybrid_triangle - hybrid_saw_high));
-        } else {
-          b = 127;
-        }
-        if (f < hybrid_saw_low) {
-          a = 255 - b;
-          c = 255;
-        } else {
-          a = 0;
-          c = b;
-        }
-        ab = 65535;
-        if (a < 127) {
-          ab /= (b - a - 1);
-        }
-        cd = 65535 / (256 - c);
-      }
-    }
-*/
 
 
 struct hexBoard_Grid_Object {
@@ -210,24 +136,41 @@ struct hexBoard_Grid_Object {
     Synth_Generation* gen = &(msg->synth_generation);
     switch (app_state) {
       case App_state::play_mode: {
+        if (!queue_try_remove(
+          &open_synth_channel_queue, 
+          b->*synthChPlaying
+        ) return;
         msg->command = synth_msg_note_on;
-        b->synthChPlaying = 0; // find next on channel queue 
         msg->item_number = b->synthChPlaying;
-
         msg->command += update_pitch;
-        // calculate from b->pitchInfo
-        gen->pitch_as_increment = 1;
+        double adj_f = frequency_after_pitch_bend(
+          b->frequency, 0, 2);
+          // TO-DO link to settings
+        gen->pitch_as_increment = frequency_to_interval(
+          adj_f, actual_audio_sample_period_in_uS);
+
         msg->command += update_volume;
-        // calculate velocity, multiply together with other info to get volume
-        gen->base_volume = 127;
+        // iso eq = 8 bit,
+        // velocity = 7 bit, 
+        // global volume = 8 bit
+        gen->base_volume = (127 * 255 * iso226(adj_f)) >> 15;
+
         msg->command += update_waveform;
         // determine from settings
-        // and if it's hybrid then make a function of F
-        gen->waveform_ID = 255;
+        // if (settings[_synthWav] == squ/saw/tri/w.e.)
+        gen->waveform_ID = hybrid_generator;
+        calculate_hybrid_params(gen->hybrid_params, adj_f,
+          //hybrid
+          0,
+          // mod wheel
+          32)
+          // TO-DO link to settings
         // gen->envelope
-        // gen->hybrid_params
+                  // TO-DO make some presets
         // gen->harmonics[0], [1], etc.
+                  // TO-DO make some presets
 
+        // force wait until message is passed.
         queue_add_blocking(&synth_msg_queue, msg);
         break;
       }

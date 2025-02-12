@@ -70,8 +70,8 @@ const uint8_t synthPins[] = {piezoPin, audioJackPin};
 const uint8_t ledPin = 22;
 const uint8_t OLED_sdaPin = 16;
 const uint8_t OLED_sclPin = 17;
-// tested at 32 microseconds and it was too short
-const uint64_t keyboard_pin_reset_period_in_uS = 64; 
+// ideal is 1/16th microsecond. tested at 64 microseconds and it was too short.
+const uint64_t keyboard_pin_reset_period_in_uS = 128; 
 // TO-DO: test on hardware v2
 const uint16_t default_analog_calibration_up = 480;
 const uint16_t default_analog_calibration_down = 280;

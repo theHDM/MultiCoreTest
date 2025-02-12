@@ -45,7 +45,7 @@ enum class Rotary_Action {
 };
 
 queue_t rotary_action_queue;
-Rotary_Action rotary_action_to_core_0;
+Rotary_Action rotary_action_out;
 
 struct Rotary_Settings {
   bool invert;
@@ -54,8 +54,8 @@ struct Rotary_Settings {
 };
 
 queue_t rotary_setting_queue;
-Rotary_Settings rotary_setting_from_core_0;
-Rotary_Settings rotary_setting_to_core_1;
+Rotary_Settings rotary_setting_in;
+Rotary_Settings rotary_setting_out;
 
 class hexBoard_Rotary_Object {
 protected:
@@ -106,8 +106,8 @@ public:
     _longPressThreshold = input.long_press_timing;
     _doubleClickThreshold = input.double_click_timing;
   }
-  void writeAction(Rotary_Action rotary_msg_from_core_1) {
-    queue_add_blocking(&rotary_action_queue, &rotary_msg_from_core_1);
+  void writeAction(Rotary_Action rotary_action_in) {
+    queue_add_blocking(&rotary_action_queue, &rotary_action_in);
   }
   void poll() {
     if (!_active) return;

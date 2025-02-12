@@ -36,17 +36,17 @@ class hexBoard_Task_Manager {
         return false;
       }
     };
-    uint64_t tick_uS;
-    uint64_t next_trigger;
+    uint32_t tick_uS;
+    uint32_t next_trigger;
     uint8_t alarm_ID; // defined as a "byte" in the RP2040 hardware
     std::vector<Task> task_list;
   public:
-    hexBoard_Task_Manager(uint64_t arg_uS) 
+    hexBoard_Task_Manager(uint32_t arg_uS) 
     : tick_uS(arg_uS), next_trigger(0), alarm_ID(0) {}
-    uint64_t get_tick_uS() {
+    uint32_t get_tick_uS() {
       return tick_uS;
     }
-    void add_task(int priority, uint64_t arg_repeat_uS, std::function<void()> arg_on_trigger) {
+    void add_task(int priority, uint32_t arg_repeat_uS, std::function<void()> arg_on_trigger) {
       Task newTask(priority, arg_repeat_uS, arg_on_trigger);
       if (task_list.empty()) {
         task_list.emplace_back(newTask);
@@ -63,21 +63,18 @@ class hexBoard_Task_Manager {
       timer_hw->alarm[alarm_ID] = next_trigger;
     }
     void start_timer() {
-      next_trigger = now();
+      next_trigger = timer_hw->timerawl;
       reset_timer();
     }
     void begin() {
       hw_set_bits(&timer_hw->inte, 1u << alarm_ID);  // initialize the timer
       irq_set_exclusive_handler(alarm_ID, on_irq_hexBoard_task_manager);    // function to run every interrupt
-      start_timer();
       irq_set_enabled(alarm_ID, true);               // ENGAGE!
-    }
-    void repeat_timer() {
-      hw_set_bits(&timer_hw->intr, 1u << alarm_ID);
-      reset_timer();
+      start_timer();
     }
     void tick() {
-      repeat_timer();
+      hw_set_bits(&timer_hw->intr, 1u << alarm_ID);
+      reset_timer();
       for (auto& i : task_list) {
         i.increment(tick_uS);
       }

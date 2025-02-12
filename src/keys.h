@@ -34,8 +34,8 @@ struct Calibration_Msg {
 };
 
 queue_t calibration_queue;
-Calibration_Msg calibration_msg_from_core_0;
-Calibration_Msg calibration_msg_to_core_1;
+Calibration_Msg calibration_msg_in;
+Calibration_Msg calibration_msg_out;
 
 struct Calibration {
   uint16_t high;
@@ -67,8 +67,8 @@ struct Key_Msg {
 };
 
 queue_t key_press_queue;
-Key_Msg key_msg_to_core_0;
-Key_Msg key_msg_from_core_1;
+Key_Msg key_msg_in;
+Key_Msg key_msg_out;
 
 struct hexBoard_Key_Object {
   const uint8_t *mux; // reference to existing constant
@@ -96,13 +96,16 @@ struct hexBoard_Key_Object {
         pinMode(*(col + i), INPUT_PULLUP); 
       }
       for (size_t j = 0; j < mux_channels_count; ++j) {
+        uint8_t k = linear_index(j,i);
         if (*(analog + i)) {
-          calibration[linear_index(j,i)]
+          calibration[k]
             .import_calibration_parameters(default_analog_calibration);
         } else { 
-          calibration[linear_index(j,i)]
+          calibration[k]
             .import_calibration_parameters(default_digital_calibration);
-        }    
+        }
+        previous_level[k] = 0;
+        was_last_read_successful[k] = true;
       }
     }
   }
@@ -144,11 +147,11 @@ struct hexBoard_Key_Object {
         attempt_to_send = (level != previous_level[index]);
       }
       if (attempt_to_send) {
-        key_msg_from_core_1.timestamp = now();
-        key_msg_from_core_1.switch_number = index;
-        key_msg_from_core_1.level = level;
+        key_msg_in.timestamp = now();
+        key_msg_in.switch_number = index;
+        key_msg_in.level = level;
         was_last_read_successful[index] = 
-          queue_try_add(&key_press_queue, &key_msg_from_core_1);
+          queue_try_add(&key_press_queue, &key_msg_in);
         previous_level[index] = level;
       }
     }

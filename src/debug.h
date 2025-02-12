@@ -58,3 +58,16 @@ struct hexBoardDebug {
   }
 };
 hexBoardDebug debug;
+
+using InterCore_Msg = uint32_t;
+queue_t pacing_queue;
+InterCore_Msg pacing_msg_in;
+InterCore_Msg pacing_msg_out;
+queue_t debug_queue;
+InterCore_Msg debug_msg_in;
+InterCore_Msg debug_msg_out;
+
+void push_core1_debug(InterCore_Msg n) {
+  debug_msg_in = n;
+  queue_try_add(&debug_queue, &debug_msg_in);
+}

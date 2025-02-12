@@ -16,8 +16,10 @@ void reset_synth_channel_queue() {
   }
   uint8_t i = 1;
   while (i <= synth_polyphony_limit) {
-    i += queue_try_add(&open_synth_channel_queue, &i);
+    bool success = queue_try_add(&open_synth_channel_queue, &i);
+    i += (uint8_t)success;
   }
+
 }
 
 void initialize_synth_channel_queue() {
@@ -44,10 +46,10 @@ int8_t sine8[] =
   , -49, -46, -43, -40, -37, -34, -31, -28, -25, -22, -19, -16, -12,  -9,  -6,  -3};
 
 struct ADSR_Envelope {
-  uint8_t attack; // express in # of samples
-  uint8_t decay;  // express in # of samples
+  uint32_t attack; // express in # of samples
+  uint32_t decay;  // express in # of samples
   uint8_t sustain; // express from 0-255
-  uint8_t release; // express in # of samples
+  uint32_t release; // express in # of samples
 };
 
 struct Hybrid_Parameters {
@@ -60,10 +62,10 @@ struct Hybrid_Parameters {
 };
 
 enum {
-  wave_shape_hybrid   = 0;
-  wave_shape_square   = 1;
-  wave_shape_saw      = 2;
-  wave_shape_triangle = 3;
+  wave_shape_hybrid   = 0,
+  wave_shape_square   = 1,
+  wave_shape_saw      = 2,
+  wave_shape_triangle = 3
 };
 
 const float hybrid_transition_square   =  220.f;
@@ -83,15 +85,15 @@ void calculate_hybrid_params(
     if (freq < hybrid_transition_saw_low) {
       model_shape = wave_shape_square;
       if (freq > hybrid_transition_square) {
-        transition_pct =  (freq - transition_square) 
-          / (transition_saw_low - transition_square);
+        transition_pct =  (freq - hybrid_transition_square) 
+          / (hybrid_transition_saw_low - hybrid_transition_square);
       }
     } else if (freq > hybrid_transition_saw_high) {
       model_shape = wave_shape_triangle;
       if (freq < hybrid_transition_triangle) {
         transition_pct = 
-            (transition_triangle - freq) 
-          / (transition_triangle - transition_saiangle);
+            (hybrid_transition_triangle - freq) 
+          / (hybrid_transition_triangle - hybrid_transition_saw_high);
       }
     } else {
       model_shape = wave_shape_saw;
@@ -164,8 +166,11 @@ struct Synth_Msg {
 };
 
 queue_t synth_msg_queue;
-Synth_Msg synth_msg_from_core_0;
-Synth_Msg synth_msg_to_core_1;
+Synth_Msg synth_msg_in;
+Synth_Msg synth_msg_out;
+
+
+    uint16_t temp;
 
 struct Synth_Voice {
   Synth_Generation generator;
@@ -174,11 +179,12 @@ struct Synth_Voice {
   
   uint8_t  phase; // off, attack, decay, sustain, release
   uint32_t envelope_counter; // used to apply envelope
-  uint16_t attack_inverse;
-  uint16_t decay_inverse;
-  uint16_t release_inverse;
+  uint32_t attack_inverse;
+  uint32_t decay_inverse;
+  uint32_t release_inverse;
 
   void pass_synth_generator(uint8_t& cmd, Synth_Generation& arg_synth_gen) {
+
     if (cmd == synth_msg_note_off) {
       phase = synth_phase_release;
       envelope_counter = 0;
@@ -194,12 +200,12 @@ struct Synth_Voice {
       generator.waveform_ID = arg_synth_gen.waveform_ID;
       generator.envelope = arg_synth_gen.envelope;
       attack_inverse  = ( !generator.envelope.attack  ? 0 :
-                          (1u << 16) / generator.envelope.attack);
+                          (1u << 32) / generator.envelope.attack);
       decay_inverse  =  ( !generator.envelope.decay   ? 0 :
-                          ((256 - generator.envelope.sustain) << 8)
+                          ((256 - generator.envelope.sustain) << 24)
                                         / generator.envelope.decay);
       release_inverse = ( !generator.envelope.release ? 0 :
-                          (1u << 16) / generator.envelope.release);
+                          (1u << 32) / generator.envelope.release);
       if (generator.waveform_ID = sine_generator) {
         uint16_t amplitude = 0;
         for (uint8_t h = 0; h < oscillator_harmonic_limit; ++h) {
@@ -222,9 +228,11 @@ struct Synth_Voice {
   }
 
   uint32_t next_sample() {
-    if (phase = synth_phase_off) return 0;
+    if (phase == synth_phase_off) return 0;
+    if (!(++temp)) {push_core1_debug(generator.base_volume);}
     if (!generator.base_volume) return 0;
     loop_counter += generator.pitch_as_increment;
+    if (!(++temp)) {push_core1_debug(loop_counter);}
     uint16_t sample = 0;
     switch (generator.waveform_ID) {
       case sine_generator: { 
@@ -270,7 +278,7 @@ struct Synth_Voice {
           envelope_level = 255;
         } else {
           ++envelope_counter;
-          envelope_level = (envelope_counter * attack_inverse) >> 8; 
+          envelope_level = (envelope_counter * attack_inverse) >> 24; 
         }
         break;
       case synth_phase_decay:
@@ -280,7 +288,7 @@ struct Synth_Voice {
           envelope_level = generator.envelope.sustain;
         } else {
           ++envelope_counter;
-          envelope_level = 255 - ((envelope_counter * decay_inverse) >> 8); 
+          envelope_level = 255 - ((envelope_counter * decay_inverse) >> 24); 
         }
         break;
       case synth_phase_sustain:
@@ -291,12 +299,16 @@ struct Synth_Voice {
           envelope_level = 0;
         } else {
           ++envelope_counter;
-          envelope_level = 255 - ((envelope_counter * release_inverse) >> 8); 
+          envelope_level = 255 - ((envelope_counter * release_inverse) >> 24); 
         }
     }
     // sample: 16bits
     // volume: 8bits
     // envelope: 8bits
+    if (!(++temp)) {push_core1_debug(sample);}
+    if (!(++temp)) {push_core1_debug(envelope_level);}
+    if (!(++temp)) {push_core1_debug(generator.base_volume);}
+
     return sample * generator.base_volume * envelope_level;
   }
 };
@@ -331,7 +343,7 @@ class hexBoard_Synth_Object {
       } else if (msg.command & synth_msg_turn_pin_on) {
         set_pin(msg.item_number, true);
       } else {
-        voice[msg.item_number]
+        voice[msg.item_number - 1] // convert 1-X to 0-X
           .pass_synth_generator(msg.command, msg.synth_generation);
       }
     }
@@ -348,7 +360,6 @@ class hexBoard_Synth_Object {
         pwm_init(s, &cfg, true);                // configure and start!
         pwm_set_gpio_level(p, 0);               // initialize at zero to prevent whining sound
       }
-      initialize_synth_channel_queue();
       active = true;
     }
 
@@ -369,6 +380,7 @@ class hexBoard_Synth_Object {
       uint8_t attenuation[] = {64,24,17,14,12,11,10,9,8};
       mixLevels *= attenuation[voiceCount];
       mixDown = mixLevels >> 30;
+      if (!(++temp)) {push_core1_debug(mixLevels);}
       for (size_t i = 0; i < pins.size(); ++i) {
         pwm_set_gpio_level(pins[i], (pin_status[pins[i]]) ? mixDown : 0);
       }

@@ -1,7 +1,7 @@
 #pragma once
 #include <Wire.h>
 #include <U8g2lib.h>
-#include "timing.h"
+#include "pico/time.h"
 
 // GUI context -- keep as integer-castable because
 // you can use bitwise comparisons to check
@@ -55,7 +55,7 @@ struct OLED_screensaver {
   , contrast_on(contrast_on_), contrast_off(contrast_off_) {}
   void jiggle() {
     if (_ptr_delay == nullptr) return;
-    switch_time = now();
+    switch_time = timer_hw->timerawl;
     switch_time += ((unsigned long long int)(*_ptr_delay) << 20);
     if (!screensaver_mode) return;
     screensaver_mode = false;
@@ -67,7 +67,7 @@ struct OLED_screensaver {
   }
   void poll() {
     if (screensaver_mode) return;
-    if (now() >= switch_time) {
+    if (timer_hw->timerawl >= switch_time) {
       screensaver_mode = true;
       u8g2.setContrast(contrast_off);
     }

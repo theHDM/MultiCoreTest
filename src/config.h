@@ -70,41 +70,24 @@ const uint8_t synthPins[] = {piezoPin, audioJackPin};
 const uint8_t ledPin = 22;
 const uint8_t OLED_sdaPin = 16;
 const uint8_t OLED_sclPin = 17;
-// ideal is 1/16th microsecond. tested at 64 microseconds and it was too short.
-const uint64_t keyboard_pin_reset_period_in_uS = 128; 
+
+const uint32_t highest_MIDI_note_Hz = 13'290;
+const uint32_t target_sample_rate_Hz = 2 * highest_MIDI_note_Hz;
+constexpr uint32_t audio_sample_interval_uS = 62'500 / (target_sample_rate_Hz >> 4);
+const uint32_t key_poll_interval_uS = 512;         // ideal is 1/16th microsecond so the whole thing is under 1 millisecond.
+const uint32_t rotary_poll_interval_uS = 768; // tested at 512 microseconds and it was too short
+
+const uint8_t LED_frame_rate_Hz = 60;
+const uint8_t OLED_frame_rate_Hz = 10;
+constexpr uint32_t LED_poll_interval_mS = 1'000 / LED_frame_rate_Hz;
+constexpr uint32_t OLED_poll_interval_mS = 1'000 / OLED_frame_rate_Hz;
+
 // TO-DO: test on hardware v2
 const uint16_t default_analog_calibration_up = 480;
 const uint16_t default_analog_calibration_down = 280;
-// tested at 512 microseconds and it was too short
-const uint64_t rotary_pin_fire_period_in_uS = 768; 
-
-const size_t ledCount = 140;  // based on the size of the NeoPixel installed
-const uint64_t target_LED_frame_rate_in_Hz = 60;
-
-const uint64_t minimum_OLED_refresh_rate_in_Hz = 10;
-const uint8_t default_contrast = 64; // range: 0-127
-const uint8_t screensaver_contrast = 1; // range: 0-127
-constexpr uint64_t one_mil_over(int A) { return 1000000 / A; }
-constexpr uint64_t target_hardware_period = 
-  rotary_pin_fire_period_in_uS < keyboard_pin_reset_period_in_uS
-  ? rotary_pin_fire_period_in_uS
-  : keyboard_pin_reset_period_in_uS;
-constexpr uint64_t OLED_refresh_period_in_uS = one_mil_over(minimum_OLED_refresh_rate_in_Hz); 
-constexpr uint64_t rotary_queue_size = OLED_refresh_period_in_uS / rotary_pin_fire_period_in_uS;
-constexpr uint64_t pixel_refresh_period_in_uS = one_mil_over(target_LED_frame_rate_in_Hz); 
-
-const uint64_t highest_MIDI_note_in_Hz = 13'290;
-const uint64_t target_audio_sample_rate_in_Hz = 2 * highest_MIDI_note_in_Hz;
-
-constexpr uint64_t target_audio_period = one_mil_over(target_audio_sample_rate_in_Hz);
-constexpr uint64_t target_audio_halfperiod = target_audio_period / 2;
-constexpr int half_until_less_than_N(int X, int N) {
-  return (X > N) ? half_until_less_than_N(X >> 1, N) : X;
-}
-constexpr uint64_t hardware_tick_in_uS = half_until_less_than_N(target_audio_halfperiod, target_hardware_period);
-constexpr uint64_t hardware_ticks_per_audio_period = target_audio_period / hardware_tick_in_uS;
-constexpr uint64_t actual_audio_sample_period_in_uS = hardware_tick_in_uS * hardware_ticks_per_audio_period;
-constexpr uint64_t actual_audio_sample_rate_in_Hz  = one_mil_over(actual_audio_sample_period_in_uS);
+const size_t   ledCount = 140;  // based on the size of the NeoPixel installed
+const uint8_t  default_contrast = 64; // range: 0-127
+const uint8_t  screensaver_contrast = 1; // range: 0-127
 
 const uint8_t synth_polyphony_limit = 8;
 const uint8_t oscillator_harmonic_limit = 15;

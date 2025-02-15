@@ -1,90 +1,62 @@
 #pragma once
-#include <array>    // structure for managing info for each key
+/* 
+ *  This is the background code that collects the
+ *  pinout level for each of the key switches on the
+ *  HexBoard. This code is run on core1 in the background 
+ *  and passes key-press messages to core0 for processing.
+ */
+
 #include <stdint.h>
+#include <functional>
+#include <array>    // structure for managing info for each key
+
 #include <Wire.h>   // needed to set pin states
-#include "timing.h" // querying system clock
-#include "config.h" // import hardware config constants
 #include "pico/util/queue.h"
+#include "pico/time.h"
+#include "config.h" // import hardware config constants
 
-struct Calibration_Parameters {
-  uint16_t low_level;
-  uint16_t high_level;
-  uint8_t resolution_bits;
-};
-
-Calibration_Parameters default_analog_calibration = {
-  .low_level = default_analog_calibration_down,
-  .high_level = default_analog_calibration_up,
-  .resolution_bits = 7
-};
-
-Calibration_Parameters default_digital_calibration = {
-  .low_level = LOW,
-  .high_level = HIGH,
-  .resolution_bits = 7
-};
-
-struct Calibration_Msg {
-  bool has_calibration_data;   // true = calibration data; false = calibration mode
-  union {
-    bool pressure_mode; // (1 = pressure, 0 = velocity)
-    uint8_t switch_number;
-  }; 
-  Calibration_Parameters calibration_parameters;
-};
-
-queue_t calibration_queue;
-Calibration_Msg calibration_msg_in;
-Calibration_Msg calibration_msg_out;
-
-struct Calibration {
-  uint16_t high;
-  uint16_t range;
-  uint8_t  resolution_bits;
-  uint8_t  floating_bits;
-  uint8_t  ceiling_value;
-  uint16_t invert_range;
-  void import_calibration_parameters(Calibration_Parameters& input) {
-    high            = input.high_level;
-    range           = high - input.low_level;
-    resolution_bits = input.resolution_bits;
-    ceiling_value   = (1u << resolution_bits) - 1;
-    floating_bits   = 16 - resolution_bits;
-    invert_range    = (ceiling_value << floating_bits) / range;
-  }
-  uint8_t calculate_level(uint16_t input, bool read_pressure) {
-    if (input >= high)         return 0;
-    if (input <= high - range) return ceiling_value;
-    if (read_pressure)         return (invert_range * (high - input)) >> floating_bits;
-                               return 1;
-  }
-};
+bool on_callback_keys(repeating_timer *t);
 
 struct Key_Msg {
-  uint64_t timestamp;
-  uint8_t switch_number;
-  uint8_t level;
+  uint32_t timestamp;
+  uint8_t  switch_number;
+  uint8_t  level;
 };
-
 queue_t key_press_queue;
-Key_Msg key_msg_in;
-Key_Msg key_msg_out;
 
-struct hexBoard_Key_Object {
-  const uint8_t *mux; // reference to existing constant
-  const uint8_t *col; // reference to existing constant
-  const bool *analog;  // reference to existing constant
-  uint8_t m_ctr; // mux counter
-  uint8_t m_val; // mux value
-  bool active;
-  bool send_pressure;
-  std::array<uint8_t, keys_count> previous_level;
-  std::array<Calibration, keys_count> calibration;
-  std::array<bool, keys_count> was_last_read_successful;
-    
-  hexBoard_Key_Object(const uint8_t *arrM, const uint8_t *arrC, const bool *arrA)
+class hexBoard_Key_Object {
+protected:
+  bool            active;         // is the object ready to run in the background
+  const uint8_t * mux;            // reference to existing constant
+  const uint8_t * col;            // reference to existing constant
+  const bool    * analog;         // reference to existing constant
+  uint8_t         m_ctr;          // mux counter
+  uint8_t         m_val;          // mux value
+  bool            send_pressure;  // are we sending key messages on pressure change
+  std::array<uint8_t,  keys_count> pressure;
+  std::array<uint16_t, keys_count> high;
+  std::array<uint16_t, keys_count> low;
+  std::array<uint16_t, keys_count> invert_range;
+  uint32_t        polling_frequency;
+  repeating_timer polling_timer;
+  int8_t ownership; // -1 = no one, 0 = core0, 1 = core1
+  void calibrate(uint8_t _k, uint16_t _hi, uint16_t _lo) {
+    high[_k] = _hi;
+    low[_k] = _lo;
+    invert_range[_k] = (127u << 9);
+    if (_hi - _lo > 1) {
+      invert_range[_k] /= (_hi - _lo);
+    }
+  }
+
+public:
+  hexBoard_Key_Object(
+    const uint8_t *arrM, 
+    const uint8_t *arrC, 
+    const bool *arrA,
+    uint32_t arg_poll_freq)
   : mux(arrM), col(arrC), analog(arrA), m_ctr(0), m_val(0), active(false)
-  , send_pressure(false) {
+  , send_pressure(false), polling_frequency(arg_poll_freq) {
     for (size_t i = 0; i < mux_pins_count; ++i) {
       pinMode(*(mux + i), OUTPUT);
       digitalWrite(*(mux + i), 0);
@@ -97,64 +69,61 @@ struct hexBoard_Key_Object {
       }
       for (size_t j = 0; j < mux_channels_count; ++j) {
         uint8_t k = linear_index(j,i);
+        pressure[k] = 0;
         if (*(analog + i)) {
-          calibration[k]
-            .import_calibration_parameters(default_analog_calibration);
+          calibrate(k,
+            default_analog_calibration_up,
+            default_analog_calibration_down
+          );
         } else { 
-          calibration[k]
-            .import_calibration_parameters(default_digital_calibration);
+          calibrate(k, 1, 0);
         }
-        previous_level[k] = 0;
-        was_last_read_successful[k] = true;
       }
     }
   }
 
-  void read_calibration_msg(Calibration_Msg& msg) {
-    if (msg.has_calibration_data) {
-      calibration[msg.switch_number]
-        .import_calibration_parameters(msg.calibration_parameters);
-    } else {
-      send_pressure = msg.pressure_mode;
-    }
-  }
+  void start() {active = true; }
+  void stop()  {active = false;}
 
-  void start() {
-    active = true;
-  }
-  
-  void stop() {
-    active = false;
+  // wrapper to safely calibrate keys from core0
+  void recalibrate(uint8_t atMux, uint8_t atCol, uint16_t newHigh, uint16_t newLow) {
+    while (ownership == 1) {}
+    ownership = 0;
+    calibrate(linear_index(atMux, atCol), newHigh, newLow);
+    ownership = -1;
   }
 
   void poll() {
-    // don't try to send messages until manual begin is set 
     if (!active) return;
-    uint8_t level;
-    uint8_t index;
-    bool attempt_to_send;
+    uint8_t  index;
+    uint16_t pin_read;
+    uint8_t  level;
+    while (ownership == 0) {}
+    ownership = 1;
     for (size_t i = 0; i < col_pins_count; ++i) {
       index = linear_index(m_val, i);
-      if (!was_last_read_successful[index]) {
-        level = previous_level[index];
-        attempt_to_send = true;
+      pin_read = *(analog + i) 
+               ? analogRead(*(col + i))
+               : digitalRead(*(col + i));
+      if (pin_read >= high[index]) {
+        level = 0;
+      } else if (pin_read <= low[index]) {
+        level = 127;
+      } else if (send_pressure) {
+        level = (invert_range[index] * (high[index] - pin_read)) >> 9;
       } else {
-        level = calibration[index].calculate_level(
-            *(analog + i) ? analogRead(*(col + i))
-                          : digitalRead(*(col + i)),
-          send_pressure
-        );
-        attempt_to_send = (level != previous_level[index]);
+        level = 64;
       }
-      if (attempt_to_send) {
-        key_msg_in.timestamp = now();
+      if (level != pressure[index]) {
+        Key_Msg key_msg_in;
+        key_msg_in.timestamp = timer_hw->timerawl;
         key_msg_in.switch_number = index;
         key_msg_in.level = level;
-        was_last_read_successful[index] = 
-          queue_try_add(&key_press_queue, &key_msg_in);
-        previous_level[index] = level;
+        queue_add_blocking(&key_press_queue, &key_msg_in);
+        pressure[index] = level;
       }
     }
+    ownership = -1;
     // this algorithm cycles through the multiplexer
     // by changing one bit at a time and still
     // making sure all permutations are reached
@@ -166,4 +135,19 @@ struct hexBoard_Key_Object {
     m_val ^= (1 << b);
     digitalWrite(*(mux + b), (m_val >> b) & 1);
   }
+  
+  void begin(alarm_pool_t *alarm_pool) {
+    // enter a positive timer value here because the poll
+    // should occur X microseconds after the routine finishes
+    alarm_pool_add_repeating_timer_us(
+      alarm_pool, polling_frequency,
+      on_callback_keys, this, &polling_timer
+    );
+    start();
+  }
 };
+
+bool on_callback_keys(repeating_timer *t) {
+  static_cast<hexBoard_Key_Object*>(t->user_data)->poll();
+  return true;
+}

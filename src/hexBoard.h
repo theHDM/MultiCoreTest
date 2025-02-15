@@ -177,79 +177,30 @@ struct hexBoard_Grid_Object {
       hardwired_switch_handler(b->pixel);
       return;
     }
-    Synth_Msg* msg = &synth_msg_in;
-    Synth_Generation* gen = &(msg->synth_generation);
     switch (app_state) {
       case App_state::play_mode: {
         if (queue_is_empty(&open_synth_channel_queue)) {
           debug.add("emptyyyy\n");
           return;
         }
-        if (queue_is_full(&synth_msg_queue)) {
-          debug.add("2many synth msgs bro\n");
-          return;
-        }
         queue_remove_blocking(
           &open_synth_channel_queue, 
           &(b->synthChPlaying)
         );
-        msg->command = synth_msg_note_on;
-        msg->item_number = b->synthChPlaying;
-        msg->command += synth_msg_update_pitch;
-        double adj_f = frequency_after_pitch_bend(
-          b->frequency, 0, 2);
-          // TO-DO link to settings
-        gen->pitch_as_increment = frequency_to_interval(
-          adj_f, actual_audio_sample_period_in_uS);
-
-        msg->command += synth_msg_update_volume;
-        // iso eq = 8 bit,
-        // velocity = 7 bit, 
-        // global volume = 8 bit
-        gen->base_volume = (settings[_synthVol].i * b->velocity * iso226(adj_f)) >> 15;
-
-        msg->command += synth_msg_update_waveform;
-        // determine from settings
-        // if (settings[_synthWav] == squ/saw/tri/w.e.)
-        gen->waveform_ID = hybrid_generator;
-        uint8_t temp = 0;
-        uint8_t temp2 = 32;
-        calculate_hybrid_params(gen->hybrid_params, adj_f,
-          // hybrid shape
-          temp,
-          // mod wheel value
-          temp2);
-          // TO-DO link to settings
-        // gen->envelope
-                  // TO-DO make some presets
-        // gen->harmonics[0], [1], etc.
-                  // TO-DO make some presets
-        // force wait until message is passed.
-        // a 45ms d 2000ms s 64/255 r 1000ms
-        // 
-        gen->envelope.attack = 45'000 / actual_audio_sample_period_in_uS;
-        gen->envelope.decay  = 2'000'000 / actual_audio_sample_period_in_uS;
-        gen->envelope.sustain = 64;
-        gen->envelope.release = 1'000'000 / actual_audio_sample_period_in_uS;
-        debug.add("synth cmd ");
-        debug.add_num(msg->command);
-        debug.add("item ");
-        debug.add_num(msg->item_number);
-        debug.add("freq ");
-        debug.add_num(adj_f);
-        debug.add("incr ");
-        debug.add_num(gen->pitch_as_increment);
-        debug.add("vol ");
-        debug.add_num(gen->base_volume);
-        debug.add("hyb ");
-        debug.add_num(gen->hybrid_params.a);
-        debug.add_num(gen->hybrid_params.b);
-        debug.add_num(gen->hybrid_params.c);
-        debug.add_num(gen->hybrid_params.d_minus_one);
-        debug.add_num(gen->hybrid_params.ab);
-        debug.add_num(gen->hybrid_params.cd);
-        debug.add("\n");
-        queue_add_blocking(&synth_msg_queue, msg);
+        Synth_Voice *v = synth.ch(b->synthChPlaying);
+        double adj_f = frequency_after_pitch_bend(b->frequency, 0, 2);
+        uint32_t int_f = frequency_to_interval(adj_f, audio_sample_interval_uS);
+        v->update_pitch(int_f);
+        wave_tbl wv_f = linear_waveform(adj_f, Linear_Wave::hybrid, 32);
+        v->update_wavetable(wv_f);
+        uint8_t vol = (settings[_synthVol].i * b->velocity * iso226(adj_f)) >> 15;
+        v->update_base_volume(vol);
+        v->update_envelope(
+          45'000 / audio_sample_interval_uS,
+          2'000'000 / audio_sample_interval_uS,
+          64,
+          1'000'000 / audio_sample_interval_uS);
+        v->note_on();
         break;
       }
       default: break;
@@ -257,24 +208,15 @@ struct hexBoard_Grid_Object {
   }
   
   void on_key_release(Button* b) {
-    Synth_Msg* msg = &synth_msg_in;
-    Synth_Generation* gen = &(msg->synth_generation);
     switch (app_state) {
       case App_state::play_mode: {
         if (!b->synthChPlaying) break;
-
-        msg->command = synth_msg_note_off;
-        msg->item_number = b->synthChPlaying;
-        if (queue_is_full(&synth_msg_queue)) {
-          debug.add("2many synth msgs bro\n");
-          return;
-        }
-        queue_add_blocking(&synth_msg_queue, msg);
+        Synth_Voice *v = synth.ch(b->synthChPlaying);
+        v->note_off();
         if (queue_is_full(&open_synth_channel_queue)) {
           debug.add("negative ghost rider the channels full\n");
           return;
         }
-        queue_add_blocking(&open_synth_channel_queue, &(b->synthChPlaying));
         b->synthChPlaying = 0;
         break;
       }

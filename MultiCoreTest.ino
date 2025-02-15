@@ -1,19 +1,18 @@
 #include <stdint.h>
-#include <functional>
-#include "src/timing.h"
+#include "pico/time.h"
 #include "src/config.h"
 #include "src/debug.h"
-#include "pico/util/queue.h"
+hexBoard_Debug_Object debug;
 
 #include "src/settings.h"
 hexBoard_Setting_Array settings;
 #include "src/file_system.h"
 
-#include "src/synth.h"
+#include "src/audio.h"
 #include "src/rotary.h"
 #include "src/keys.h"
-#include "src/taskmgr.h"
 
+#include "src/synth.h"
 #include "src/hexBoard.h"
 hexBoard_Grid_Object   hexBoard(hexBoard_layout_v1_2);
 
@@ -40,13 +39,14 @@ void link_settings_to_objects(hexBoard_Setting_Array& refS) {
   debug.setStatus(&refS[_debug].b);
   oled_screensaver.setDelay(&refS[_SStime].i);
 }
-
+/*
 void send_rotary_settings_from(hexBoard_Setting_Array& refS) {
   rotary_setting_in.invert = settings[_rotInv].b;
   rotary_setting_in.double_click_timing = (settings[_rotDblCk].i * 1000);
   rotary_setting_in.long_press_timing = (settings[_rotLongP].i * 1000);
   queue_add_blocking(&rotary_setting_queue, &rotary_setting_in);
 }
+*/
 
 void process_play_mode_knob(Rotary_Action& A) {
   switch (A) {
@@ -112,37 +112,86 @@ void process_menu_input(Rotary_Action& A) {
   }    
 }
 
-// set up so that the LED and OLED routines do not try to run at the same time
-Task_Alarm timer_refresh_lights(pixel_refresh_period_in_uS, 5'000);
-Task_Alarm timer_refresh_OLED(OLED_refresh_period_in_uS, 20'000);
-Task_Alarm timer_send_debug(1'000'000, 0);
+struct repeating_timer polling_timer_LED;
+bool on_LED_frame_refresh(repeating_timer *t) {
+  return true;
+}
+
+struct repeating_timer polling_timer_OLED;
+bool on_OLED_frame_refresh(repeating_timer *t) {
+  switch (app_state) {
+    case App_state::menu_nav:
+    case App_state::edit_mode:
+      menu.drawMenu(); // when menu is active, call GUI update through menu refresh
+      oled_screensaver.jiggle();
+      break;
+    case App_state::play_mode:
+      u8g2.clearBuffer();
+      draw_GUI(_show_HUD + _show_dashboard);
+      u8g2.sendBuffer();
+      break;
+    default:
+      break;
+  }
+  return true;
+}
+
+struct repeating_timer polling_timer_debug;
+bool on_debug_refresh(repeating_timer *t) {
+  debug.send();
+  return true;
+}
+
+hexBoard_Synth_Object  synth(synthPins, 2, audio_sample_interval_uS);
+hexBoard_Rotary_Object rotary(rotaryPinA, rotaryPinB, rotaryPinC, rotary_poll_interval_uS);
+hexBoard_Key_Object    keys(muxPins, colPins, analogPins, key_poll_interval_uS);
+
+void start_background_processes() {
+  alarm_pool_t *core1pool;
+  core1pool = alarm_pool_create(2, 16);
+  synth .begin(core1pool);
+  rotary.begin(core1pool);
+  keys  .begin(core1pool);
+  // once these objects are run, then core_1 will
+  // run background processes only
+}
 
 void setup() {
+  queue_init(&key_press_queue, sizeof(Key_Msg), keys_count + 1);
+  queue_init(&rotary_action_queue,  sizeof(Rotary_Action),  32);
   load_factory_defaults_to(settings);
   mount_tinyUSB();
   connect_OLED_display(OLED_sdaPin, OLED_sclPin);
   connect_neoPixels(ledPin, ledCount);
-
-
-  pacing_msg_in = 1;
-  queue_add_blocking(&pacing_queue, &pacing_msg_in);
-
   mount_file_system();  
+  link_settings_to_objects(settings);
   //if (!load_settings(settings)) { // attempt to load saved settings, and if not,  
   //}  
-
-  // send calibration messages to core 1 based on current settings
-  link_settings_to_objects(settings);
-  send_rotary_settings_from(settings);
-
+  //  send_rotary_settings_from(settings);
   init_MIDI();
   initialize_synth_channel_queue();
   menu_setup();
-  timer_refresh_lights.start();
-  timer_refresh_OLED.start();
-  timer_send_debug.start();
+  add_repeating_timer_ms(
+    -LED_poll_interval_mS, 
+    on_LED_frame_refresh, NULL, 
+    &polling_timer_LED
+  );
+  add_repeating_timer_ms(
+    -OLED_poll_interval_mS,
+    on_OLED_frame_refresh, NULL, 
+    &polling_timer_OLED
+  );
+  add_repeating_timer_ms(
+    -1'000,
+    on_debug_refresh, NULL, 
+    &polling_timer_debug
+  );
+  multicore_launch_core1(start_background_processes);
   app_state = App_state::play_mode;
 }
+
+Key_Msg key_msg_out;
+Rotary_Action rotary_action_out;
 
 void loop() {
   if (queue_try_remove(&key_press_queue, &key_msg_out)) {
@@ -156,81 +205,4 @@ void loop() {
       default:                                                               break;
     }
   }
-  if (queue_try_remove(&debug_queue, &debug_msg_out)) {
-    debug.add("core 1 msg @ ");
-    debug.timestamp();
-    debug.add(" = ");
-    debug.add_num(debug_msg_out);
-    debug.add("\n");
-  }
-  if (timer_refresh_lights.ifDone_thenRepeat()) {
-    // LED show next frame
-  }
-  if (timer_refresh_OLED.ifDone_thenRepeat()) {
-    switch (app_state) {
-      case App_state::menu_nav:
-      case App_state::edit_mode:
-        menu.drawMenu(); // when menu is active, call GUI update through menu refresh
-        oled_screensaver.jiggle();
-        break;
-      case App_state::play_mode:
-        u8g2.clearBuffer();
-        draw_GUI(_show_HUD + _show_dashboard);
-        u8g2.sendBuffer();
-        break;
-      default:
-        break;
-    }
-  }
-  if (timer_send_debug.ifDone_thenRepeat()) {    
-    debug.send();
-  }
-}
-
-hexBoard_Synth_Object  synth(synthPins, 2);
-hexBoard_Rotary_Object rotary(rotaryPinA, rotaryPinB, rotaryPinC);
-hexBoard_Key_Object    keys(muxPins, colPins, analogPins);
-hexBoard_Task_Manager  task_mgr(hardware_tick_in_uS);
-
-void setup1() {
-  queue_init(&pacing_queue,         sizeof(InterCore_Msg),   4);
-  queue_init(&debug_queue,          sizeof(InterCore_Msg),   128);
-  queue_init(&calibration_queue,    sizeof(Calibration_Msg), keys_count + 4);
-  queue_init(&key_press_queue,      sizeof(Key_Msg),         512);
-  queue_init(&rotary_setting_queue, sizeof(Rotary_Settings), 4);
-  queue_init(&rotary_action_queue,  sizeof(Rotary_Action),   rotary_queue_size);
-  queue_init(&synth_msg_queue,      sizeof(Synth_Msg),       512);
-  // wait for pacing message before starting background processes
-  queue_remove_blocking(&pacing_queue, &pacing_msg_out);
-  synth.begin();
-  task_mgr.add_task( // audio sample update - highest priority (stable period needed)
-    1, actual_audio_sample_period_in_uS, 
-    std::bind(&hexBoard_Synth_Object::poll,  &synth)); 
-  rotary.start();
-  task_mgr.add_task( // rotary knob - 2nd highest priority (input drop risk)
-    2, rotary_pin_fire_period_in_uS,
-    std::bind(&hexBoard_Rotary_Object::poll, &rotary)); 
-  keys.start();
-  task_mgr.add_task( // keyboard - lowest priority
-    3, keyboard_pin_reset_period_in_uS,
-    std::bind(&hexBoard_Key_Object::poll,    &keys)); 
-  task_mgr.begin();
-}
-
-void loop1() {
-  if (queue_try_remove(&synth_msg_queue, &synth_msg_out)) {
-    push_core1_debug(synth_msg_out.command + 2000);
-    synth.interpret_synth_msg(synth_msg_out);
-  }
-  //if (queue_try_remove(&rotary_setting_queue, &rotary_setting_out)) {
-  //  rotary.import_settings(rotary_setting_out);
-  //  push_core1_debug(11);
-  //}
-  //if (!queue_is_empty(&calibration_queue)) {
-  //  keys.stop();
-  //  while (queue_try_remove(&calibration_queue, &calibration_msg_out)) {
-  //    keys.read_calibration_msg(calibration_msg_out);
-  //  }
-  //  keys.start();
-  //}
 }

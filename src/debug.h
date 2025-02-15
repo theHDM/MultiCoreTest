@@ -1,14 +1,14 @@
 #pragma once
 #include <Arduino.h>
 #include <string>
-#include "timing.h"
-struct hexBoardDebug {
+#include "pico/time.h"
+
+struct hexBoard_Debug_Object {
+  volatile uint8_t ownership;
+
   bool *_ptrIsOn;
   std::string msg;
-  hexBoardDebug()  : _ptrIsOn(nullptr) {}
-  void setStatus(bool *_ptr) {
-    _ptrIsOn = _ptr;
-  }
+  hexBoard_Debug_Object()  : _ptrIsOn(nullptr) {}
   bool isOn() {
     if (_ptrIsOn == nullptr) return false;
     return *_ptrIsOn;
@@ -17,57 +17,52 @@ struct hexBoardDebug {
     if (_ptrIsOn == nullptr) return false;
     return !(*_ptrIsOn);
   }
-  void add(std::string s) {    
+  void add(std::string s, bool core1 = false) {    
     if (isOff()) return;
+    while (ownership == (core1 ? 1 : 2)) {}
+    ownership = (core1 ? 2 : 1);
     msg += s; 
+    ownership = 0;
   }
-  template <typename T> void add_num(T i) { 
+  template <typename T> void add_num(T i, bool core1 = false) { 
     if (isOff()) return;
+    while (ownership == (core1 ? 1 : 2)) {}
+    ownership = (core1 ? 2 : 1);
     msg += std::to_string(i); 
     msg += " ";
+    ownership = 0;
   }
-  void timestamp() {
+  void timestamp(bool core1 = false) { 
     if (isOff()) return;
+    while (ownership == (core1 ? 1 : 2)) {}
+    ownership = (core1 ? 2 : 1);
     msg += "@ time ";
-    msg += std::to_string(now()/1000000.f);
+    msg += std::to_string(timer_hw->timerawl/1000000.f);
     msg += ": ";
+    ownership = 0;
+  }
+
+  // only run by primary core
+  void setStatus(bool *_ptr) {
+    while (ownership == 2) {}
+    ownership = 1;
+    _ptrIsOn = _ptr;
+    ownership = 0;
   }
   void clear() {
+    while (ownership == 2) {}
+    ownership = 1;
     msg.clear();
+    ownership = 0;
   }
   void send() {
     if (isOn()) {
+      while (ownership == 2) {}
+      ownership = 1;
       Serial.flush();
       Serial.print(msg.c_str()); 
+      ownership = 0;
       clear();
     }
   }		
-  void knobTurns(int turns) {
-    if (turns != 0) {
-      timestamp();
-      add_num(turns);
-      add(" knob turns since last OLED frame\n");
-    }
-  }
-  void knobClick(unsigned long long int duration) {
-    if (duration > 0) {
-      timestamp();
-      add_num((float)duration / 1000000.f);
-      add(" second knob click acknowledged\n");
-    }
-  }
 };
-hexBoardDebug debug;
-
-using InterCore_Msg = uint32_t;
-queue_t pacing_queue;
-InterCore_Msg pacing_msg_in;
-InterCore_Msg pacing_msg_out;
-queue_t debug_queue;
-InterCore_Msg debug_msg_in;
-InterCore_Msg debug_msg_out;
-
-void push_core1_debug(InterCore_Msg n) {
-  debug_msg_in = n;
-  queue_try_add(&debug_queue, &debug_msg_in);
-}

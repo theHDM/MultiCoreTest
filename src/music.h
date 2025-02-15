@@ -29,7 +29,7 @@ uint8_t iso226(const double& f) {
   if (f <    200.0) return 255;
   if (f <   1500.0) return 191 + ldexp(abs(f- 800) /  700.d, 6);
   if (f <   5000.0) return 127 + ldexp(abs(f-3250) / 1750.d, 7);
-  if (f < highest_MIDI_note_in_Hz) return 255;
+  if (f < highest_MIDI_note_Hz) return 255;
   return 0;
 }
 

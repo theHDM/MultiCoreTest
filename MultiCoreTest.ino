@@ -3,20 +3,72 @@
 #include "src/config.h"
 #include "src/debug.h"
 hexBoard_Debug_Object debug;
-
+volatile int successes = 0;
+volatile int screenupdate = 0;
 #include "src/settings.h"
 hexBoard_Setting_Array settings;
 #include "src/file_system.h"
 
 #include "src/audio.h"
+hexBoard_Synth_Object  synth(synthPins, 2);
 #include "src/rotary.h"
+hexBoard_Rotary_Object rotary(rotaryPinA, rotaryPinB, rotaryPinC);
 #include "src/keys.h"
+hexBoard_Key_Object    keys(muxPins, colPins, analogPins);
 
-#include "src/synth.h"
+bool on_callback_synth(struct repeating_timer *t) {
+  successes++;
+  synth.poll();
+  return true;
+}
+bool on_callback_rotary(struct repeating_timer *t) {
+  rotary.poll();
+  return true;
+}
+bool on_callback_keys(struct repeating_timer *t) {
+  keys.poll();
+  return true;
+}
+
+void start_background_processes() {
+  alarm_pool_t *core1pool;
+  core1pool = alarm_pool_create(1, 4);
+  
+  synth.begin();
+  struct repeating_timer timer_synth;
+  // enter a negative timer value here because the poll
+  // should occur X microseconds after the routine starts
+  alarm_pool_add_repeating_timer_us(core1pool, 
+    - static_cast<int64_t>(audio_sample_interval_uS), 
+    on_callback_synth, NULL, &timer_synth);
+
+  rotary.begin();
+  struct repeating_timer timer_rotary;
+  // enter a positive timer value here because the poll
+  // should occur X microseconds after the routine finishes
+  alarm_pool_add_repeating_timer_us(core1pool,
+    rotary_poll_interval_uS, on_callback_rotary,
+    NULL, &timer_rotary);
+
+  keys.begin();
+  struct repeating_timer timer_keys;
+  // enter a positive timer value here because the poll
+  // should occur X microseconds after the routine finishes
+  alarm_pool_add_repeating_timer_us(core1pool, 
+    key_poll_interval_uS, on_callback_keys, 
+    NULL, &timer_keys);
+
+  while (1) {}
+  // once these objects are run, then core_1 will
+  // run background processes only
+}
+
+#include "src/synth.h"  // direct digital synthesis math
+#include "src/music.h"  // microtonal and MIDI math
+#include "src/MIDI_and_USB.h"
 #include "src/hexBoard.h"
 hexBoard_Grid_Object   hexBoard(hexBoard_layout_v1_2);
 
-#include "src/MIDI_and_USB.h"
 #include "src/LED.h"
 #include "src/OLED.h"
 OLED_screensaver       oled_screensaver(default_contrast, screensaver_contrast);
@@ -48,6 +100,66 @@ void send_rotary_settings_from(hexBoard_Setting_Array& refS) {
 }
 */
 
+
+void interpret_key_msg(Key_Msg& msg) {
+  Button* b = &(hexBoard.button_at_linear_index(msg.switch_number));
+  b->update_levels(msg.timestamp, msg.level);
+  if (b->check_and_reset_just_pressed()) {
+    if (!b->isBtn) {
+      hardwired_switch_handler(b->pixel);
+      return;
+    }
+    switch (app_state) {
+      case App_state::play_mode:
+      case App_state::menu_nav: {
+        if (queue_is_empty(&open_synth_channel_queue)) {
+          debug.add("emptyyyy\n");
+          return;
+        }
+        queue_remove_blocking(
+          &open_synth_channel_queue, 
+          &(b->synthChPlaying)
+        );
+        Synth_Voice *v = &synth.voice[(b->synthChPlaying) - 1];
+        double adj_f = frequency_after_pitch_bend(b->frequency, 0, 2);
+        v->update_pitch(frequency_to_interval(adj_f, audio_sample_interval_uS));
+        v->update_wavetable(linear_waveform(adj_f, Linear_Wave::hybrid, 0));
+        v->update_base_volume((settings[_synthVol].i * b->velocity * iso226(adj_f)) >> 15);
+        v->update_envelope(
+          1000000 / audio_sample_interval_uS,
+          1000000 / audio_sample_interval_uS,
+          212,
+          2500000 / audio_sample_interval_uS);
+        v->note_on();
+        break;
+      }
+      default: break;
+    }
+  } else if (b->check_and_reset_just_released()) {
+    switch (app_state) {
+      case App_state::play_mode:
+      case App_state::menu_nav: {
+        if (!b->synthChPlaying) break;
+        Synth_Voice *v = &synth.voice[(b->synthChPlaying) - 1];
+        v->note_off();
+        if (queue_is_full(&open_synth_channel_queue)) {
+          debug.add("negative ghost rider the channels full\n");
+          return;
+        }
+        queue_add_blocking(
+          &open_synth_channel_queue, 
+          &(b->synthChPlaying)
+        );
+        b->synthChPlaying = 0;
+        break;
+      }
+      default: break;
+    }
+  } else if (b->pressure) {
+    //
+  }
+}
+
 void process_play_mode_knob(Rotary_Action& A) {
   switch (A) {
     // TO-DO -- route other actions to various commands
@@ -62,6 +174,7 @@ void process_play_mode_knob(Rotary_Action& A) {
 
 void process_menu_input(Rotary_Action& A) {
   if (!menu.readyForKey()) return;
+  screenupdate = 1;
 	bool editingFloat = menu.isEditMode();
   if (editingFloat) {
     GEMItemPublic pubItem = *(menu.getCurrentMenuPage()->getCurrentMenuItem());
@@ -110,6 +223,7 @@ void process_menu_input(Rotary_Action& A) {
     default:
       break;
   }    
+  screenupdate = 0;
 }
 
 struct repeating_timer polling_timer_LED;
@@ -122,6 +236,7 @@ bool on_OLED_frame_refresh(repeating_timer *t) {
   switch (app_state) {
     case App_state::menu_nav:
     case App_state::edit_mode:
+      if (screenupdate) break;
       menu.drawMenu(); // when menu is active, call GUI update through menu refresh
       oled_screensaver.jiggle();
       break;
@@ -138,22 +253,10 @@ bool on_OLED_frame_refresh(repeating_timer *t) {
 
 struct repeating_timer polling_timer_debug;
 bool on_debug_refresh(repeating_timer *t) {
+  debug.add_num(successes);
+  debug.add("\n");
   debug.send();
   return true;
-}
-
-hexBoard_Synth_Object  synth(synthPins, 2, audio_sample_interval_uS);
-hexBoard_Rotary_Object rotary(rotaryPinA, rotaryPinB, rotaryPinC, rotary_poll_interval_uS);
-hexBoard_Key_Object    keys(muxPins, colPins, analogPins, key_poll_interval_uS);
-
-void start_background_processes() {
-  alarm_pool_t *core1pool;
-  core1pool = alarm_pool_create(2, 16);
-  synth .begin(core1pool);
-  rotary.begin(core1pool);
-  keys  .begin(core1pool);
-  // once these objects are run, then core_1 will
-  // run background processes only
 }
 
 void setup() {
@@ -172,12 +275,12 @@ void setup() {
   initialize_synth_channel_queue();
   menu_setup();
   add_repeating_timer_ms(
-    -LED_poll_interval_mS, 
+    LED_poll_interval_mS, 
     on_LED_frame_refresh, NULL, 
     &polling_timer_LED
   );
   add_repeating_timer_ms(
-    -OLED_poll_interval_mS,
+    OLED_poll_interval_mS,
     on_OLED_frame_refresh, NULL, 
     &polling_timer_OLED
   );
@@ -195,7 +298,7 @@ Rotary_Action rotary_action_out;
 
 void loop() {
   if (queue_try_remove(&key_press_queue, &key_msg_out)) {
-    hexBoard.interpret_key_msg(key_msg_out);
+    interpret_key_msg(key_msg_out);
     // if you are in calibration mode, that routine can send msgs to calibration_queue
   }
   if (queue_try_remove(&rotary_action_queue, &rotary_action_out)) {

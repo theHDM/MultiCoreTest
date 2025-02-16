@@ -25,7 +25,7 @@ enum class ADSR_Phase {
 };
 
 struct Synth_Voice {
-  uint8_t wavetable[256];
+  int8_t wavetable[256];
   uint32_t pitch_as_increment;
   uint8_t base_volume;
   uint32_t attack; // express in # of samples
@@ -34,7 +34,8 @@ struct Synth_Voice {
   uint32_t release; // express in # of samples
 
   uint32_t loop_counter;
-  uint32_t envelope_counter; // used to apply envelope
+  int32_t envelope_counter; // used to apply envelope
+  uint8_t envelope_level; // stored to ensure even fade at release
   ADSR_Phase phase;  
   uint32_t attack_inverse;
   uint32_t decay_inverse;
@@ -44,7 +45,7 @@ struct Synth_Voice {
   // define a series of setter functions for core0
   // which will block if core1 is trying to calculate
   // the next sample.
-  void update_wavetable(uint8_t* tbl) {
+  void update_wavetable(std::array<int8_t,256> tbl) {
     while (ownership == 1) {}
     ownership = 0;
     for (size_t i = 0; i <  256; ++i) {
@@ -52,19 +53,19 @@ struct Synth_Voice {
     }
     ownership = -1;
   }
-  void update_pitch(uint32_t& increment) {
+  void update_pitch(uint32_t increment) {
     while (ownership == 1) {}
     ownership = 0;
     pitch_as_increment = increment;
     ownership = -1;
   }
-  void update_base_volume(uint8_t& volume) {
+  void update_base_volume(uint8_t volume) {
     while (ownership == 1) {}
     ownership = 0;
     base_volume = volume;
     ownership = -1;
   }
-  void update_envelope(uint32_t& a, uint32_t& d, uint8_t& s, uint32_t& r) {
+  void update_envelope(uint32_t a, uint32_t d, uint8_t s, uint32_t r) {
     while (ownership == 1) {}
     ownership = 0;
     attack = a;
@@ -73,7 +74,7 @@ struct Synth_Voice {
     release = r;
     attack_inverse  = !a ? 0 : 0xFFFFFFFF / a;
     decay_inverse   = !d ? 0 : ((256 - s) << 24) / d;
-    release_inverse = !r ? 0 : 0xFFFFFFFF / r;
+    release_inverse = !r ? 0 : (s << 24) / r;
     ownership = -1;
   }
   void note_on() {
@@ -86,18 +87,18 @@ struct Synth_Voice {
   void note_off() {
     while (ownership == 1) {}
     ownership = 0;
-    envelope_counter = 0;
     phase = ADSR_Phase::release;
-    ownership = -1;
+    envelope_counter = 0;
+    if (envelope_level != sustain) {
+       envelope_counter = round((1.f - ((float)envelope_level / sustain)) * release);
+    }
   }
   // called from core 1 only
-  uint32_t next_sample() {
+  int32_t next_sample() {
     while (ownership == 0) {}
     ownership = 1;
     loop_counter += pitch_as_increment;
-    uint8_t sample = wavetable[loop_counter >> 24];
-
-    uint8_t envelope_level = 0;
+    int8_t sample = wavetable[loop_counter >> 24];
     switch (phase) {
       case ADSR_Phase::attack:
         if (envelope_counter == attack) {
@@ -119,35 +120,30 @@ struct Synth_Voice {
           envelope_level = 255 - ((envelope_counter * decay_inverse) >> 24); 
         }
         break;
-      case ADSR_Phase::sustain:
+      case ADSR_Phase::sustain: 
         envelope_level = sustain;
+        break;
       case ADSR_Phase::release:
         if (envelope_counter == release) {
           phase = ADSR_Phase::off;
           envelope_level = 0;
         } else {
           ++envelope_counter;
-          envelope_level = 255 - ((envelope_counter * release_inverse) >> 24); 
+          envelope_level = sustain - ((envelope_counter * release_inverse) >> 24); 
         }
     }
     ownership = -1;
-    return sample * base_volume * envelope_level;
+    return (sample * base_volume * envelope_level) >> 8;
   }
-
 };
 
-bool on_callback_synth(repeating_timer *t);
-
-class hexBoard_Synth_Object {
-protected:
+struct hexBoard_Synth_Object {
   bool active;
   std::array<Synth_Voice, synth_polyphony_limit> voice;
   std::vector<uint8_t> pins;
   bool pin_status[GPIO_pin_count];
   pwm_config cfg;
-  uint32_t        polling_frequency;
-  repeating_timer polling_timer;
-  uint8_t         ownership;
+  uint8_t ownership;
 
   void internal_set_pin(uint8_t pin, bool activate) {
     auto n = std::find(pins.begin(), pins.end(), pin);
@@ -155,9 +151,8 @@ protected:
       pin_status[pin] = activate;
   }
 
-public:
-  hexBoard_Synth_Object(const uint8_t* pins, size_t count, uint32_t arg_poll_freq)
-  : active(false), polling_frequency(arg_poll_freq) {
+  hexBoard_Synth_Object(const uint8_t* pins, size_t count)
+  : active(false) {
     for (size_t i = 0; i < GPIO_pin_count; ++i) {
       pin_status[i] = false;
     }
@@ -168,10 +163,6 @@ public:
   void start() {active = true;}
   void stop() {active = false;}
 
-  Synth_Voice& ch(uint8_t c) {
-    return voice[c-1];
-  }
-
   void set_pin(uint8_t pin, bool activate) {
     while (ownership == 1) {}
     ownership = 0;
@@ -181,33 +172,57 @@ public:
 
   void poll() {
     if (!active) return;
-    uint8_t voiceCount = 0;
-    uint32_t mixLevels = 0;
-    uint8_t mixDown = 0;
-
+    int32_t mixLevels = 0;
     while (ownership == 0) {}
+    bool anyVoicesOn = false;
     for (auto& v : voice) {
       if (v.phase == ADSR_Phase::off) continue;
       if (!v.base_volume) continue;
-      ++voiceCount;
+      anyVoicesOn = true;
       mixLevels += v.next_sample();
     }
-    // 24 bits per voice
-    // attenuation factor = 8 bits = 255 / sqrt(max_poly * actual_poly)
-    uint8_t attenuation[] = {255,90,64,52,45,40,37,34,32};
-    mixLevels *= attenuation[voiceCount];
-    mixDown = mixLevels >> 24;
+    uint16_t mixDown = 0;
+    if (anyVoicesOn) {
+      // waveform formula:
+      // amplitude ~ sqrt(10^(dB/10))
+      // dB ~ 2 * 10 * log10(level/max_level)
+      // 24 bits per voice (1 << 24)
+      // if there are 8 voices at max, clip possible at (8 << 24)
+      // level  1   2   3   4   5   6   7   8
+      // dB   -18 -12  -9  -6  -4 -2.5 -1  0
+      // compression of 3:1 
+      // dB   -6  -4   -3  -2  -1.4 -0.8 -0.4 0
+      // level 4   5   5.7 6.4 6.8  7.3  7.7  8
+      // lvl/255 = old lvl/255 ^ 1/3
+      // this formula is a dirty linear estimate of ^1/3 that
+      // also scales the level down to the right # of bits
+      // 
+      // Compression = lvl<25% ? lvl*1403/512 : [297 + 315*lvl] /512
+      mixLevels /= synth_polyphony_limit;
+      if (std::abs(mixLevels) < (1u << 13)) {
+        mixLevels *= 1403;
+      } else {
+        mixLevels *= 315;
+        mixLevels += 297;
+      }
+      mixLevels >>= 25 - audio_bits;
+      mixDown = (1u << (audio_bits - 1)) + mixLevels - 1;
+    }
     ownership = 1;
     for (size_t i = 0; i < pins.size(); ++i) {
-      pwm_set_gpio_level(pins[i], (pin_status[pins[i]]) ? mixDown : 0);
+      if (!anyVoicesOn && (pins[i] != piezoPin)) {
+        pwm_set_gpio_level(pins[i], (pin_status[pins[i]]) ? (1u << (audio_bits - 1)) - 1 : 0);
+      } else {
+        pwm_set_gpio_level(pins[i], (pin_status[pins[i]]) ? mixDown : 0);
+      }
     }
     ownership = -1;
   }
 
-  void begin(alarm_pool_t *alarm_pool) {
+  void begin() {
     cfg = pwm_get_default_config();
     pwm_config_set_clkdiv(&cfg, 1.0f);
-    pwm_config_set_wrap(&cfg, (1u << 8) - 2);
+    pwm_config_set_wrap(&cfg, (1u << audio_bits) - 2);
     pwm_config_set_phase_correct(&cfg, true);
     for (size_t i = 0; i < pins.size(); ++i) {
       uint8_t p = pins[i];
@@ -216,23 +231,9 @@ public:
       pwm_init(s, &cfg, true);                // configure and start!
       pwm_set_gpio_level(p, 0);               // initialize at zero to prevent whining sound
     }
-    // enter a negative timer value here because the poll
-    // should occur X microseconds after the routine starts
-    alarm_pool_add_repeating_timer_us(
-      alarm_pool, 
-      - polling_frequency,
-      on_callback_synth,
-      this, 
-      &polling_timer
-    );
     start();
   }
 };
-
-bool on_callback_synth(repeating_timer *t) {
-  static_cast<hexBoard_Synth_Object*>(t->user_data)->poll();
-  return true;
-}
 
 // core0 uses a queue to determine
 // how to assign voices to new notes

@@ -15,8 +15,6 @@
 #include "pico/time.h"
 #include "config.h" // import hardware config constants
 
-bool on_callback_keys(repeating_timer *t);
-
 struct Key_Msg {
   uint32_t timestamp;
   uint8_t  switch_number;
@@ -37,8 +35,6 @@ protected:
   std::array<uint16_t, keys_count> high;
   std::array<uint16_t, keys_count> low;
   std::array<uint16_t, keys_count> invert_range;
-  uint32_t        polling_frequency;
-  repeating_timer polling_timer;
   int8_t ownership; // -1 = no one, 0 = core0, 1 = core1
   void calibrate(uint8_t _k, uint16_t _hi, uint16_t _lo) {
     high[_k] = _hi;
@@ -50,13 +46,9 @@ protected:
   }
 
 public:
-  hexBoard_Key_Object(
-    const uint8_t *arrM, 
-    const uint8_t *arrC, 
-    const bool *arrA,
-    uint32_t arg_poll_freq)
-  : mux(arrM), col(arrC), analog(arrA), m_ctr(0), m_val(0), active(false)
-  , send_pressure(false), polling_frequency(arg_poll_freq) {
+  hexBoard_Key_Object(const uint8_t *arrM, const uint8_t *arrC, const bool *arrA)
+  : mux(arrM), col(arrC), analog(arrA), m_ctr(0), m_val(0)
+  , active(false), send_pressure(false) {
     for (size_t i = 0; i < mux_pins_count; ++i) {
       pinMode(*(mux + i), OUTPUT);
       digitalWrite(*(mux + i), 0);
@@ -136,18 +128,7 @@ public:
     digitalWrite(*(mux + b), (m_val >> b) & 1);
   }
   
-  void begin(alarm_pool_t *alarm_pool) {
-    // enter a positive timer value here because the poll
-    // should occur X microseconds after the routine finishes
-    alarm_pool_add_repeating_timer_us(
-      alarm_pool, polling_frequency,
-      on_callback_keys, this, &polling_timer
-    );
+  void begin() {
     start();
   }
 };
-
-bool on_callback_keys(repeating_timer *t) {
-  static_cast<hexBoard_Key_Object*>(t->user_data)->poll();
-  return true;
-}

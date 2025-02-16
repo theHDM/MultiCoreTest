@@ -66,7 +66,7 @@ const uint8_t rotaryPinB = 21;
 const uint8_t rotaryPinC = 24;
 const uint8_t piezoPin = 23;
 const uint8_t audioJackPin = 25;
-const uint8_t synthPins[] = {piezoPin, audioJackPin};
+const uint8_t synthPins[] = {audioJackPin};
 const uint8_t ledPin = 22;
 const uint8_t OLED_sdaPin = 16;
 const uint8_t OLED_sclPin = 17;
@@ -74,11 +74,11 @@ const uint8_t OLED_sclPin = 17;
 const uint32_t highest_MIDI_note_Hz = 13'290;
 const uint32_t target_sample_rate_Hz = 2 * highest_MIDI_note_Hz;
 constexpr uint32_t audio_sample_interval_uS = 62'500 / (target_sample_rate_Hz >> 4);
-const uint32_t key_poll_interval_uS = 512;         // ideal is 1/16th microsecond so the whole thing is under 1 millisecond.
+const uint32_t key_poll_interval_uS = 96;         // ideal is 1/16th microsecond so the whole thing is under 1 millisecond.
 const uint32_t rotary_poll_interval_uS = 768; // tested at 512 microseconds and it was too short
 
 const uint8_t LED_frame_rate_Hz = 60;
-const uint8_t OLED_frame_rate_Hz = 10;
+const uint8_t OLED_frame_rate_Hz = 24;
 constexpr uint32_t LED_poll_interval_mS = 1'000 / LED_frame_rate_Hz;
 constexpr uint32_t OLED_poll_interval_mS = 1'000 / OLED_frame_rate_Hz;
 
@@ -89,8 +89,8 @@ const size_t   ledCount = 140;  // based on the size of the NeoPixel installed
 const uint8_t  default_contrast = 64; // range: 0-127
 const uint8_t  screensaver_contrast = 1; // range: 0-127
 
-const uint8_t synth_polyphony_limit = 8;
-const uint8_t oscillator_harmonic_limit = 15;
+const uint8_t synth_polyphony_limit = 16;
+const uint8_t audio_bits = 9;
 
 // names of the columns
 enum {

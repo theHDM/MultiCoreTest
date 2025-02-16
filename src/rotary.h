@@ -27,8 +27,6 @@ enum class Rotary_Action {
 };
 queue_t rotary_action_queue;
 
-bool on_callback_rotary(repeating_timer *t);
-
 class hexBoard_Rotary_Object {
 protected:
   bool _active;
@@ -94,16 +92,14 @@ protected:
     _doubleClickThreshold = setDC * 1000;
   }
 
-  uint32_t        polling_frequency;
-  repeating_timer polling_timer;
   uint8_t         ownership;
 
 public:
-  hexBoard_Rotary_Object(uint8_t Apin, uint8_t Bpin, uint8_t Cpin, uint32_t arg_poll_freq)
-  : _Apin(Apin), _Bpin(Bpin), _Cpin(Cpin), polling_frequency(arg_poll_freq)
+  hexBoard_Rotary_Object(uint8_t Apin, uint8_t Bpin, uint8_t Cpin)
+  : _Apin(Apin), _Bpin(Bpin), _Cpin(Cpin)
   , _active(false), _turnState(0), _clickState(0)
   , _prevClickTime(0), _prevHoldTime(0)
-  , _invert(false), _longPressThreshold(0), _doubleClickThreshold(0)
+  , _invert(false), _longPressThreshold(750000), _doubleClickThreshold(500000)
   , _doubleClickRegistered(false) , _longPressRegistered(false) {
     pinMode(_Apin, INPUT_PULLUP);
     pinMode(_Bpin, INPUT_PULLUP);
@@ -182,21 +178,8 @@ public:
     ownership = -1;
   }
   
-  void begin(alarm_pool_t *alarm_pool) {
-    // enter a positive timer value here because the poll
-    // should occur X microseconds after the routine finishes
-    alarm_pool_add_repeating_timer_us(
-      alarm_pool, 
-      polling_frequency,
-      on_callback_rotary,
-      this, 
-      &polling_timer
-    );
+  void begin() {
     start();
   }
 };
 
-bool on_callback_rotary(repeating_timer *t) {
-  static_cast<hexBoard_Rotary_Object*>(t->user_data)->poll();
-  return true;
-}

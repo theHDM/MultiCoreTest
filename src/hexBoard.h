@@ -46,9 +46,9 @@ struct Button {
 /*!!*/  bool     isCmd  = false;  // is it a command button
 /*!!*/  uint8_t  cmd = 0;  // control parameter corresponding to this hex
 
-  uint64_t timeLastUpdate = 0; // store time that key level was last updated
-  uint64_t timePressBegan = 0; // store time that full press occurred
-  uint64_t timeHeldSince  = 0;
+  uint32_t timeLastUpdate = 0; // store time that key level was last updated
+  uint32_t timePressBegan = 0; // store time that full press occurred
+  uint32_t timeHeldSince  = 0;
   uint8_t  pressure       = 0; // press level currently
   uint8_t  velocity       = 0; // proxy for velocity
   bool     just_pressed   = false;
@@ -56,7 +56,7 @@ struct Button {
   uint8_t  midiChPlaying  = 0;          // what midi channel is there currrently a note-on
   uint8_t  synthChPlaying = 0;         // what synth channel is there currrently a note-on
 
-  void update_levels(uint64_t& timestamp, uint8_t& new_level) {
+  void update_levels(uint32_t& timestamp, uint8_t& new_level) {
     if (pressure == new_level) return;
     timeLastUpdate = timestamp;
     if (new_level == 0) {
@@ -132,7 +132,7 @@ struct hexBoard_Grid_Object {
           b->LEDcodeRest     = 0x11111100; // calculate it once and store value, to make LED playback snappier
           b->LEDcodeOff      = 0; // calculate it once and store value, to make LED playback snappier
           b->LEDcodeDim      = 0x11111100; // calculate it once and store value, to make LED playback snappier
-          b->frequency       = 440.0; // equivalent pitch in Hz
+          b->frequency       = 10.0 + (b->pixel * 10.0); // equivalent pitch in Hz
           b->midiCh          = 1;      // what channel assigned (if not MPE mode)   [1..16]
           b->midiTuningTable = 255; // assigned MIDI note (if MTS mode) [0..127]
           b->scaleEquave     = 0;
@@ -171,73 +171,4 @@ struct hexBoard_Grid_Object {
   bool in_bounds(Hex& coord) {
     return (coord_to_pixel.find(coord) != coord_to_pixel.end());
   }
-
-  void on_key_press(Button* b) {
-    if (!b->isBtn) {
-      hardwired_switch_handler(b->pixel);
-      return;
-    }
-    switch (app_state) {
-      case App_state::play_mode: {
-        if (queue_is_empty(&open_synth_channel_queue)) {
-          debug.add("emptyyyy\n");
-          return;
-        }
-        queue_remove_blocking(
-          &open_synth_channel_queue, 
-          &(b->synthChPlaying)
-        );
-        Synth_Voice *v = synth.ch(b->synthChPlaying);
-        double adj_f = frequency_after_pitch_bend(b->frequency, 0, 2);
-        uint32_t int_f = frequency_to_interval(adj_f, audio_sample_interval_uS);
-        v->update_pitch(int_f);
-        wave_tbl wv_f = linear_waveform(adj_f, Linear_Wave::hybrid, 32);
-        v->update_wavetable(wv_f);
-        uint8_t vol = (settings[_synthVol].i * b->velocity * iso226(adj_f)) >> 15;
-        v->update_base_volume(vol);
-        v->update_envelope(
-          45'000 / audio_sample_interval_uS,
-          2'000'000 / audio_sample_interval_uS,
-          64,
-          1'000'000 / audio_sample_interval_uS);
-        v->note_on();
-        break;
-      }
-      default: break;
-    }
-  }
-  
-  void on_key_release(Button* b) {
-    switch (app_state) {
-      case App_state::play_mode: {
-        if (!b->synthChPlaying) break;
-        Synth_Voice *v = synth.ch(b->synthChPlaying);
-        v->note_off();
-        if (queue_is_full(&open_synth_channel_queue)) {
-          debug.add("negative ghost rider the channels full\n");
-          return;
-        }
-        b->synthChPlaying = 0;
-        break;
-      }
-      default: break;
-    }    
-  }
-
-  void on_key_hold(Button* b) {
-    // nothing right now
-  }
-
-  void interpret_key_msg(Key_Msg& msg) {
-    Button* thisBtn = &(button_at_linear_index(msg.switch_number));
-    thisBtn->update_levels(msg.timestamp, msg.level);
-           if (thisBtn->check_and_reset_just_pressed())  {
-      on_key_press(thisBtn);
-    } else if (thisBtn->check_and_reset_just_released()) {
-      on_key_release(thisBtn);
-    } else if (thisBtn->pressure) {
-      on_key_hold(thisBtn);
-    }
-  }
-
 };

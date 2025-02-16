@@ -20,7 +20,7 @@
 #include "pico/time.h"
 #include "config.h" // import hardware config constants
 
-using wave_tbl = std::array<uint8_t, 256>;
+using wave_tbl = std::array<int8_t, 256>;
 
 //
 // Linear waveforms such as square, saw, and triangle waves
@@ -42,7 +42,7 @@ const float f_hyb_saw_high =  880.f;
 const float f_hyb_triangle = 1760.f;
 enum class Linear_Wave {square, saw, triangle, hybrid};
 
-wave_tbl linear_waveform(double& _f, Linear_Wave& _shp, uint8_t& _mod) {
+wave_tbl linear_waveform(double _f, Linear_Wave _shp, uint8_t _mod) {
   Linear_Wave m_shp = _shp;
   float t_pct = 0.f;
   if (_shp == Linear_Wave::hybrid) {
@@ -87,19 +87,19 @@ wave_tbl linear_waveform(double& _f, Linear_Wave& _shp, uint8_t& _mod) {
   }
   wave_tbl result;
   for (uint8_t i = 0; i <= a; ++i) {
-    result[i] = 0;
+    result[i] = -127;
   }
   if (a < b - 1) {
     for (uint8_t i = a + 1; i <= b - 1; ++i) {
-      result[i] = ((i - a) * (65536 / (b - 1 - a))) >> 8;
+      result[i] = (((i - a) * ((254 << 8) / (b - 1 - a))) >> 8) - 127;
     }
   }
   for (uint8_t i = b; i <= c; ++i) {
-    result[i] = 255;
+    result[i] = 127;
   }
   if (c < d - 1) {
     for (uint8_t i = c + 1; i <= d - 1; ++i) {
-      result[i] = ((d - i) * (65536 / (d - 1 - c))) >> 8;
+      result[i] = (((d - i) * ((254 << 8) / (d - 1 - c))) >> 8) - 127;
     }
   }
   return result;
@@ -116,7 +116,7 @@ wave_tbl additive_synthesis(size_t harmonicLimit, float* amt, float* phase) {
   for (uint8_t i = 0; i < 256; ++i) {
     raw[i] = 0.0;
     for (size_t h = 0; h < harmonicLimit; ++h) {
-      raw[i] += amt[i] * std::sin(2 * (h + 1) * pi * (&phase + (i / 256.f)));
+      raw[i] += amt[i] * std::sin(2 * (h + 1) * pi * (phase[i] + (i / 256.f)));
     }
     if (std::abs(raw[i]) > normalize) {
       normalize = std::abs(raw[i]);
@@ -125,12 +125,30 @@ wave_tbl additive_synthesis(size_t harmonicLimit, float* amt, float* phase) {
   normalize = 127 / normalize;
   wave_tbl result;
   for (uint8_t i = 0; i < 256; ++i) {
-    result[i] = 127 + round(raw[i] * normalize);
+    result[i] = round(raw[i] * normalize);
   }
   return result;
 }
 
+uint32_t frequency_to_interval(
+  const double&   frequency, 
+  const uint64_t& interval_in_uS) {
+  return lround(ldexp(frequency * interval_in_uS / 1000000.d, 32));
+}
 
-
-
+uint8_t iso226(const double& f) {
+  // a very crude implementation of ISO 226 equal loudness curves
+  //   Hz dB  Amplitude ~ sqrt(10^(dB/10))
+  //  200 +0  255
+  //  800 -3  191
+  // 1500 +0  255
+  // 3250 -6  127
+  // 5000 +0  255
+  if (f <      8.0) return 0;
+  if (f <    200.0) return 255;
+  if (f <   1500.0) return 191 + ldexp(abs(f- 800) /  700.d, 6);
+  if (f <   5000.0) return 127 + ldexp(abs(f-3250) / 1750.d, 7);
+  if (f < highest_MIDI_note_Hz) return 255;
+  return 0;
+}
 

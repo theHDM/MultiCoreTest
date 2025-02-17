@@ -1,4 +1,3 @@
-
 scale: 
 period and degrees in cents
 
@@ -16,13 +15,6 @@ hex where the root is.
 map steps R then DL.
 gaps too big then will skip some entries
 
-my daxko
-Kbia2025????
-}
-microsoft for execdir
-Rugosa2022!
-pin kbia1910
-
 given an edo, assign tiers 
 meantone rule
 figure out exceptions and set
@@ -37,59 +29,26 @@ tier 0
 F *C* G D A E B
 tier 1, but what if its enharmoni
 
-
-
-
 ?
-
 count by 4s. 101 means from flat 11p
-
 # F C G D   A
-
 size of fifth:
 if edo is a weird one
 
 
-
 color palettes:
-
 1-12 different primary hues
-
 0 white
 -1 +1 black
 then different levels of same hue
 
-
-
 kite style: find patent val of each prime, map that hue to that tier
-
 
 !! add a quick transpose up down and input size of trasp the qose step in cents
 
-
-
-
-
 store
-
 base color
 gradient object info
-
-
-
-
-subdirectories
-
-hardware/hw config timing, hwaudio, keys, etc
-settings/
-layout/vocabulary, library, palette, readSCL readKBM,
-
-
-priorities
-1) hardware irq at last + uS, not now + uS
-2) confirm library works  ok
-3) confirm transfer to hex object works
-4) add in layout info and confirm it wo
 
 assign color to scale.
 1) get okLCH of each RGB maximum.
@@ -97,7 +56,6 @@ assign color to scale.
 3) assign to spread am
 euclid difference
 calculatcolor difference
-
 
 always need a period size / octave.
 
@@ -111,7 +69,6 @@ regardless of step size,
 
 LAYOUT by step axis (member of struct)
 can attempt to guess step axis in certain scenarios but best to just let it be defined as a rule.
-
 
 SCALE is permitted (SCALA superset, KBM subset)
 
@@ -165,12 +122,8 @@ palette depends
 
 step D2: color by rainbow step, dim sharps? or two tone.
 
-
-
 layout assumes C = 1.
 mode means shift the
-
-
 
 2d lattice cents:
 input period, X and Y cent. will be isomorphic but if coprime then enharmonics will exist
@@ -188,8 +141,6 @@ input JI fraction X and Y (uint/uint) and equave (period)
 
 write tuning table that covers full grid
 then octave equivalence
-
-
 
 MOS scale
 input generator and period and set size. optional superset (not isomorphic) or infinite (calc large and small and pass to 2d lattice)
@@ -218,24 +169,6 @@ disambiguate
 https://en.xen.wiki/w/Scale
 scale is the subset.
 tuning is the superset.
-
--------
-
-
-
-first C test generator
-
-design a const struct
-come up with algorithm for a basic one
-can you cOut the correct answers
-then as you go layer it into the firmware and confirm it runs
-
-colors will probably be last cuz of that gradient shit
-overrides shd come last
-
-
-
-
 scale setting mode,
 highlight just one set of keys in one period (maybe define in setup)
 can cycle the mode, or let user toggle on and off what note is in key, then save.
@@ -256,7 +189,6 @@ set anchor = offset from concert, and CC midi
 
 transpose is done by 12edo semitone, internally it changes anchor +cents without changing layout
 
-
 MTS tuning table
 1. get the set of pitches
 2. sort by pitch
@@ -266,7 +198,6 @@ MTS tuning table
 6. make it so that the noteOn plays the assoc midi note
 
 MIDI note is a one to one with frequency
-
 
 scala -> period and steps in cents
 kbm->
@@ -279,41 +210,3 @@ anchor note (global tuning)
 Hz of that note
 formal octave
 vector of mapping
-
-
-
-
-meanwhile to get things running,
-pretend each
-
-
-
-
-
-store as a vec or map
-pack for saving
-unpack for loading
-
-get and set value
-
-on set, run a "what if settings change" check at the end of loop
-
-
-get setting value
-
-use a predefined settings array
-enum with useful name?
-settingName =
-
-bugs
-
-1) int type mismatch in wheel definition
-2)
-
-
-opin size age shape color orig mater purpose
-wacky waving inflatable arm flailing tube man
-
-wacky opinion
-waving
- 

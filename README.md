@@ -26,7 +26,7 @@ anchor note is scale zero
 color of Do is scale X
 count until 
 tier 0
-F *C* G D A E B
+F C G D A E B
 tier 1, but what if its enharmoni
 
 ?

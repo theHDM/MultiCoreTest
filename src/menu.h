@@ -37,19 +37,33 @@ struct GEMPagePublic : public GEMPage {
 
 void doNothing() {}
 GEMPagePublic pgNoMenu("",_show_HUD + _show_custom_msg, 0,0,0, doNothing);
+
 GEMPagePublic pgHome("Hexboard v1.1", _show_HUD, 0, 7, 0);
 GEMPagePublic pgShowMsg("",_show_custom_msg, 6, 1, 0, pgHome);
+
 GEMPagePublic pgLayout("Layout editor", _show_HUD, 0, 7, 0, pgHome);
-GEMPagePublic pgPlayback("MIDI and synth settings", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 19, pgHome);
-GEMPagePublic pgHardware("Hardware settings", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-GEMPagePublic pgSoftware("Software settings", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-GEMPagePublic pgSavePreset("Select slot to save in", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-GEMPagePublic pgLoadPreset("Select slot to load from", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-GEMPagePublic pgReboot("Power off options", _show_HUD, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-GEMPagePublic pgEdit("Edit current layout...", _show_pixel_ID, 1, GEM_ITEMS_COUNT_AUTO, 7, pgLayout);
 GEMPagePublic pgTuning("Tuning system parameters", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 6, pgLayout);
 GEMPagePublic pgGenerate("Select layout parameters", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 6, pgLayout);
 GEMPagePublic pgAnchor("Select root key and tuning", _show_pixel_ID, 1, GEM_ITEMS_COUNT_AUTO, 6, pgGenerate);
+
+GEMPagePublic pgPlayback("MIDI and synth settings", _show_HUD, 0, GEM_ITEMS_COUNT_AUTO, 3, pgHome);
+GEMPagePublic pgMIDI("MIDI settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 19, pgPlayback);
+GEMPagePublic pgMIDIout("MIDI out ports", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 3, pgMIDI);
+GEMPagePublic pgSynth("Synth settings", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 8, pgPlayback);
+
+GEMPagePublic pgHardware("Hardware settings", _show_HUD, 0, GEM_ITEMS_COUNT_AUTO, 0, pgHome);
+GEMPagePublic pgRotary("Rotary settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 5, pgHardware);
+GEMPagePublic pgCommand("Command key settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 5, pgHardware);
+GEMPagePublic pgOLED("OLED settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 5, pgHardware);
+
+GEMPagePublic pgSoftware("Software settings", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
+
+GEMPagePublic pgSavePreset("Select slot to save in", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
+
+GEMPagePublic pgLoadPreset("Select slot to load from", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
+
+GEMPagePublic pgReboot("Power off options", _show_HUD, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
+GEMPagePublic pgEdit("Edit current layout...", _show_pixel_ID, 1, GEM_ITEMS_COUNT_AUTO, 7, pgLayout);
 
 GEMSelect dropdown_notes(128, (SelectOptionInt[]){
  {"C -1", 0},{"C#-1", 1},{"D -1", 2},{"Eb-1", 3}, {"E -1", 4},{"F -1", 5},
@@ -74,6 +88,271 @@ GEMSelect dropdown_notes(128, (SelectOptionInt[]){
  {"F#8",114},{"G 8",115},{"G#8",116},{"A 8",117}, {"Bb8",118},{"B 8",119},
  {"C 9",120},{"C#9",121},{"D 9",122},{"Eb9",123}, {"E 9",124},{"F 9",125},
  {"F#9",126},{"G 9",127}});
+
+// Roland MT-32 mode (1987)
+GEMSelect dropdown_mt32(128, (SelectOptionInt[]){
+  {"Acoustic Piano 1",    1},
+  {"Acoustic Piano 2",    2},
+  {"Acoustic Piano 3",    3},
+  {"Electric Piano 1",    4},
+  {"Electric Piano 2",    5},
+  {"Electric Piano 3",    6},
+  {"Electric Piano 4",    7},
+  {"Honkytonk",           8},
+  {"Electric Organ 1",    9},
+  {"Electric Organ 2",   10},
+  {"Electric Organ 3",   11},
+  {"Electric Organ 4",   12},
+  {"Pipe Organ 1",       13},
+  {"Pipe Organ 2",       14},
+  {"Pipe Organ 3",       15},
+  {"Accordion",          16},
+  {"Harpsichord 1",      17},
+  {"Harpsichord 2",      18},
+  {"Harpsichord 3",      19},
+  {"Clavinet 1",         20},
+  {"Clavinet 2",         21},
+  {"Clavinet 3",         22},
+  {"Celesta 1",          23},
+  {"Celesta 2",          24},
+  {"Synth Brass 1",      25},
+  {"Synth Brass 2",      26},
+  {"Synth Brass 3",      27},
+  {"Synth Brass 4",      28},
+  {"Synth Bass 1",       29},
+  {"Synth Bass 2",       30},
+  {"Synth Bass 3",       31},
+  {"Synth Bass 4",       32},
+  {"Fantasy",            33},
+  {"Harmo Pan",          34},
+  {"Chorale",            35},
+  {"Glasses",            36},
+  {"Soundtrack",         37},
+  {"Atmosphere",         38},
+  {"Warm Bell",          39},
+  {"Funny Vox",          40},
+  {"Echo Bell",          41},
+  {"Ice Rain",           42},
+  {"Oboe 2001",          43},
+  {"Echo Pan",           44},
+  {"Doctor Solo",        45},
+  {"School Daze",        46},
+  {"Bellsinger",         47},
+  {"Square Wave",        48},
+  {"String Section 1",   49},
+  {"String Section 2",   50},
+  {"String Section 3",   51},
+  {"Pizzicato",          52},
+  {"Violin 1",           53},
+  {"Violin 2",           54},
+  {"Cello 1",            55},
+  {"Cello 2",            56},
+  {"Contrabass",         57},
+  {"Harp 1",             58},
+  {"Harp 2",             59},
+  {"Guitar 1",           60},
+  {"Guitar 2",           61},
+  {"Elec Gtr 1",         62},
+  {"Elec Gtr 2",         63},
+  {"Sitar",              64},
+  {"Acou Bass 1",        65},
+  {"Acou Bass 2",        66},
+  {"Elec Bass 1",        67},
+  {"Elec Bass 2",        68},
+  {"Slap Bass 1",        69},
+  {"Slap Bass 2",        70},
+  {"Fretless 1",         71},
+  {"Fretless 2",         72},
+  {"Flute 1",            73},
+  {"Flute 2",            74},
+  {"Piccolo 1",          75},
+  {"Piccolo 2",          76},
+  {"Recorder",           77},
+  {"Pan Pipes",          78},
+  {"Sax 1",              79},
+  {"Sax 2",              80},
+  {"Sax 3",              81},
+  {"Sax 4",              82},
+  {"Clarinet 1",         83},
+  {"Clarinet 2",         84},
+  {"Oboe",               85},
+  {"English Horn",       86},
+  {"Bassoon",            87},
+  {"Harmonica",          88},
+  {"Trumpet 1",          89},
+  {"Trumpet 2",          90},
+  {"Trombone 1",         91},
+  {"Trombone 2",         92},
+  {"French Horn 1",      93},
+  {"French Horn 2",      94},
+  {"Tuba",               95},
+  {"Brass Section 1",    96},
+  {"Brass Section 2",    97},
+  {"Vibe 1",             98},
+  {"Vibe 2",             99},
+  {"Synth Mallet",      100},
+  {"Windbell",          101},
+  {"Glock",             102},
+  {"Tube Bell",         103},
+  {"Xylophone",         104},
+  {"Marimba",           105},
+  {"Koto",              106},
+  {"Sho",               107},
+  {"Shakuhachi",        108},
+  {"Whistle 1",         109},
+  {"Whistle 2",         110},
+  {"Bottleblow",        111},
+  {"Breathpipe",        112},
+  {"Timpani",           113},
+  {"Melodic Tom",       114},
+  {"Deep Snare",        115},
+  {"Elec Perc 1",       116},
+  {"Elec Perc 2",       117},
+  {"Taiko",             118},
+  {"Taiko Rim",         119},
+  {"Cymbal",            120},
+  {"Castanets",         121},
+  {"Triangle",          122},
+  {"Orchestra Hit",     123},
+  {"Telephone",         124},
+  {"Bird Tweet",        125},
+  {"One Note Jam",      126},
+  {"Water Bell",        127},
+  {"Jungle Tune",       128}
+});
+
+// General MIDI 1 Patch List
+GEMSelect dropdown_gm(128, (SelectOptionInt[]){
+  {"Acoustic GrandPiano",  1},
+  {"BrightAcousticPiano",  2},
+  {"Electric GrandPianp",  3},
+  {"Honky-tonk Piano",     4},
+  {"Electric Piano 1",     5},
+  {"Electric Piano 2",     6},
+  {"Harpsichord",          7},
+  {"Clavi",                8},
+  {"Celesta",              9},
+  {"Glockenspiel",        10},
+  {"Music Box",           11},
+  {"Vibraphone",          12},
+  {"Marimba",             13},
+  {"Xylophone",           14},
+  {"Tubular Bells",       15},
+  {"Dulcimer",            16},
+  {"Drawbar Organ",       17},
+  {"Percussive Organ",    18},
+  {"Rock Organ",          19},
+  {"Church Organ",        20},
+  {"Reed Organ",          21},
+  {"Accordion",           22},
+  {"Harmonica",           23},
+  {"Tango Accordion",     24},
+  {"AcousticGuitarNylon", 25},
+  {"AcousticGuitarSteel", 26},
+  {"ElectricGuitar Jazz", 27},
+  {"ElectricGuitarClean", 28},
+  {"ElectricGuitarMuted", 29},
+  {"Overdrive Guitar",    30},
+  {"Distortion Guitar",   31},
+  {"Guitar harmonics",    32},
+  {"Acoustic Bass",       33},
+  {"ElectricBass Finger", 34},
+  {"El Bass (pick)",      35},
+  {"Fretless Bass",       36},
+  {"Slap Bass 1",         37},
+  {"Slap Bass 2",         38},
+  {"Synth Bass 1",        39},
+  {"Synth Bass 2",        40},
+  {"Violin",              41},
+  {"Viola",               42},
+  {"Cello",               43},
+  {"Contrabass",          44},
+  {"Tremolo Strings",     45},
+  {"Pizzicato Strings",   46},
+  {"Orchestral Harp",     47},
+  {"Timpani",             48},
+  {"String Ensemble 1",   49},
+  {"String Ensemble 2",   50},
+  {"Synth Strings 1",     51},
+  {"Synth Strings 2",     52},
+  {"Choir Aahs",          53},
+  {"Voice Oohs",          54},
+  {"Synth Voice",         55},
+  {"Orchestra Hit",       56},
+  {"Trumpet",             57},
+  {"Trombone",            58},
+  {"Tuba",                59},
+  {"Muted Trumpet",       60},
+  {"French Horn",         61},
+  {"Brass Section",       62},
+  {"Synth Brass 1",       63},
+  {"Synth Brass 2",       64},
+  {"Soprano Sax",         65},
+  {"Alto Sax",            66},
+  {"Tenor Sax",           67},
+  {"Baritone Sax",        68},
+  {"Oboe",                69},
+  {"English Horn",        70},
+  {"Bassoon",             71},
+  {"Clarinet",            72},
+  {"Piccolo",             73},
+  {"Flute",               74},
+  {"Recorder",            75},
+  {"Pan Flute",           76},
+  {"Blown Bottle",        77},
+  {"Shakuhachi",          78},
+  {"Whistle",             79},
+  {"Ocarina",             80},
+  {"Lead 1 (square)",     81},
+  {"Lead 2 (sawtooth)",   82},
+  {"Lead 3 (calliope)",   83},
+  {"Lead 4 (chiff)",      84},
+  {"Lead 5 (charang)",    85},
+  {"Lead 6 (voice)",      86},
+  {"Lead 7 (fifths)",     87},
+  {"Lead 8 (bass+lead)",  88},
+  {"Pad 1 (new age)",     89},
+  {"Pad 2 (warm)",        90},
+  {"Pad 3 (poly synth)",  91},
+  {"Pad 4 (choir)",       92},
+  {"Pad 5 (bowed)",       93},
+  {"Pad 6 (metallic)",    94},
+  {"Pad 7 (halo)",        95},
+  {"Pad 8 (sweep)",       96},
+  {"FX 1 (rain)",         97},
+  {"FX 2 (soundtrack)",   98},
+  {"FX 3 (crystal)",      99},
+  {"FX 4 (atmosphere)",  100},
+  {"FX 5 (brightness)",  101},
+  {"FX 6 (goblins)",     102},
+  {"FX 7 (echoes)",      103},
+  {"FX 8 (sci-fi)",      104},
+  {"Sitar",              105},
+  {"Banjo",              106},
+  {"Shamisen",           107},
+  {"Koto",               108},
+  {"Kalimba",            109},
+  {"Bag pipe",           110},
+  {"Fiddle",             111},
+  {"Shanai",             112},
+  {"Tinkle Bell",        113},
+  {"Agogo",              114},
+  {"Steel Drums",        115},
+  {"Woodblock",          116},
+  {"Taiko Drum",         117},
+  {"Melodic Tom",        118},
+  {"Synth Drum",         119},
+  {"Reverse Cymbal",     120},
+  {"Guitar Fret Noise",  121},
+  {"Breath Noise",       122},
+  {"Seashore",           123},
+  {"Bird Tweet",         124},
+  {"Telephone Ring",     125},
+  {"Helicopter",         126},
+  {"Applause",           127},
+  {"Gunshot",            128}
+});
+
 GEMSelect dropdown_dir(6, (SelectOptionInt[]){
   {"Right",0},{"Up-Rt",1},{"Up-Lft",2},{"Left",3},{"Dn-Lft",4},{"Dn-Rt",5}});
 GEMSelect dropdown_speed(7, (SelectOptionInt[]){
@@ -105,35 +384,46 @@ GEMSelect dropdown_bright(7, (SelectOptionInt[]){
   {"High",   _globlBrt_high},
   {"THE SUN",_globlBrt_max}
 });
-GEMSelect dropdown_MIDImode(4, (SelectOptionInt[]){
-  {"Normal", _MIDImode_standard},
-  {"MPE", _MIDImode_MPE},
-  {"MTS", _MIDImode_tuning_table},
-  {"MIDI2.0", _MIDImode_2_point_oh}
-});
-GEMSelect dropdown_MIDIout(4, (SelectOptionInt[]){
-  {"None",_MIDIout_none},
-  {"USB",_MIDIout_USB},
-  {"Jack",_MIDIout_serial},
-  {"Both",_MIDIout_both}
-});
 GEMSelect dropdown_synth_mode(4, (SelectOptionInt[]){
-  {"Off",_synthTyp_off},
-  {"Mono",_synthTyp_mono},
-  {"Arp'gio",_synthTyp_arpeggio},
-  {"Poly",_synthTyp_poly}
+  {"  Off",   _synthTyp_off},
+  {"  Mono",  _synthTyp_mono},
+  {"Arpeggio",_synthTyp_arpeggio},
+  {"  Poly",  _synthTyp_poly}
 });
 GEMSelect dropdown_wave(7, (SelectOptionInt[]){
-  {"Hybrid",_synthWav_hybrid},
-  {"Square",_synthWav_square},
-  {"Saw",_synthWav_saw},
-  {"Triangl",_synthWav_triangle},
-  {"Sine",_synthWav_sine},
-  {"Strings",_synthWav_strings},
-  {"Clarint",_synthWav_clarinet}
+  {" Hybrid", _synthWav_hybrid},
+  {" Square", _synthWav_square},
+  {"  Saw",   _synthWav_saw},
+  {"Triangle",_synthWav_triangle},
+  {" Sine",   _synthWav_sine},
+  {"Strings", _synthWav_strings},
+  {"Clarinet",_synthWav_clarinet}
+});
+GEMSelect dropdown_adsr(6,(SelectOptionInt[]){
+  {"  None",   _synthEnv_none},
+  {"  Hit",    _synthEnv_hit},
+  {" Pluck",   _synthEnv_pluck},
+  {" Strum",   _synthEnv_strum},
+  {"  Slow",   _synthEnv_slow},
+  {"Reverse",  _synthEnv_reverse}
+});
+GEMSelect dropdown_palette(3, (SelectOptionInt[]){
+  {"Rainbow",_palette_rainbow},
+  {"Tiered", _palette_tiered},
+  {"Alt",    _palette_alternate}
 });
 GEMSelect dropdown_fps(4, (SelectOptionInt[]){
   {"24",24},{"30",30},{"60",60},{"70",70}});
+GEMSelect dropdown_MIDImode(4, (SelectOptionInt[]){
+  {"MIDI Mode: Normal", _MIDImode_standard},
+  {"MIDI Mode: MPE", _MIDImode_MPE},
+  {"MIDI Mode: MTS", _MIDImode_tuning_table},
+  {"MIDI Mode: 2.0", _MIDImode_2_point_oh}
+});
+GEMSelect dropdown_instruments(2, (SelectOptionInt[]){
+  {"General MIDI PC:", _GM_instruments},
+  {"Roland MT-32 PC:", _MT32_instruments}
+});
 GEMSelect dropdown_MPE(3, (SelectOptionInt[]){
   {"1-zone master ch 1 ", 0},
   {"1-zone master ch 16", 1},
@@ -171,20 +461,27 @@ GEMSelect dropdown_MPE_right(14, (SelectOptionInt[]){
   {"14 voices, ch 2-16 ", 2},
   {"15 voices, ch 1-16 ", 1}
 });
+GEMSelect dropdown_MPE_PB(5, (SelectOptionInt[]){
+  {"Pitch bend +/-  2",2 },
+  {"Pitch bend +/- 12",12},
+  {"Pitch bend +/- 24",24},
+  {"Pitch bend +/- 48",48},
+  {"Pitch bend +/- 96",96}
+});
 
 GEMSpinner spin_0_127   ((GEMSpinnerBoundariesInt){1,   0, 127});
 GEMSpinner spin_n127_127((GEMSpinnerBoundariesInt){1,-127, 127});
 GEMSpinner spin_0_255   ((GEMSpinnerBoundariesInt){1,   0, 255});
 GEMSpinner spin_1_255   ((GEMSpinnerBoundariesInt){1,   1, 255});
+GEMSpinner spin_100_1k  ((GEMSpinnerBoundariesInt){10,100,1000});
+GEMSpinner spin_500_2k  ((GEMSpinnerBoundariesInt){10,500,2000});
 
 #include "settings.h"
 GEMItem *menuItem[_settingSize];
+
 GEMItem blank("",doNothing);        // always visible
 GEMItem spacer_1("",doNothing); // can set visible or hidden independently
 GEMItem spacer_2("",doNothing); // can set visible or hidden independently
-
-// this is the callback handler for any menu items that are
-// linked to a user settings variable
 
 void showHide_tuning() {
   menuItem[_equaveC]->hide(settings[_equaveJI].b);
@@ -197,7 +494,16 @@ void showHide_tuning() {
   menuItem[_modeLgSm]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
   menuItem[_eqDivs]->hide(settings[_tuneSys].i != _tuneSys_equal);
 }
-
+void showHide_MPE() {
+  menuItem[_MPEzoneC]->hide(settings[_MIDImode].i != _MIDImode_MPE);
+  menuItem[_MPEzoneL]->hide(settings[_MIDImode].i != _MIDImode_MPE);
+  menuItem[_MPEzoneR]->hide(settings[_MIDImode].i != _MIDImode_MPE);
+  menuItem[_MPEpb]->hide(settings[_MIDImode].i != _MIDImode_MPE);
+}
+void showHide_PC() {
+  menuItem[_MIDIpc]->hide(settings[_MIDIorMT].i != _GM_instruments);
+  menuItem[_MT32pc]->hide(settings[_MIDIorMT].i != _MT32_instruments);
+}
 void showHide_generate() {
   menuItem[_lgStepA]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
   menuItem[_smStepA]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
@@ -213,6 +519,41 @@ void showHide_generate() {
   menuItem[_JIdenA]->hide(settings[_tuneSys].i != _tuneSys_just);
   menuItem[_JInumB]->hide(settings[_tuneSys].i != _tuneSys_just);
   menuItem[_JIdenB]->hide(settings[_tuneSys].i != _tuneSys_just);
+}
+
+// the menu items created based on settings
+// will pass thru this callback function
+// first. here we'll ONLY put in menu-related
+// callback items (i.e. showing/hiding entries).
+// then in the main program we'll
+// flesh out other code-related activity.
+// positive integer callbacks mean it came from the
+// associated setting menu item.
+// negative integer callbacks are to trigger
+// special routines.
+
+enum {
+  _run_routine_to_generate_layout = -1,
+
+};
+
+extern void menu_handler(int settingNumber);
+
+void onChg(GEMCallbackData callbackData) {
+  switch (callbackData.valInt) {
+    case _equaveJI:
+      showHide_tuning();
+      break;
+    case _MIDImode:
+      showHide_MPE();
+      break;
+    case _MIDIorMT:
+      showHide_PC();
+      break;
+    default: 
+      break;
+  }
+  menu_handler(callbackData.valInt);
 }
 
 void onSelect_generate(GEMCallbackData callbackData) {
@@ -237,36 +578,26 @@ void onComplete_generate() {
   menu.setMenuPageCurrent(pgShowMsg);
 }
 
-extern void change_audio_out_pins();
-
-void onChg(GEMCallbackData callbackData) {
-  switch (callbackData.valInt) {
-    case _debug: 
-      break;
-    case _equaveJI:
-      showHide_tuning();
-      break;
-    default: 
-      break;
-  }
-}
-
-
-#define _CREATE_MANUAL(A, T, L)    menuItem[A] = new GEMItem(L, settings[A].T,    onChg, A)
-#define _CREATE_SELECT(A, T, L, S) menuItem[A] = new GEMItem(L, settings[A].T, S, onChg, A)
 
 void create_menu_items_for_user_settings() {
+  #define _CREATE_MANUAL(A, T, L)    menuItem[A] = new GEMItem(L, settings[A].T,    onChg, A)
+  #define _CREATE_SELECT(A, T, L, S) menuItem[A] = new GEMItem(L, settings[A].T, S, onChg, A)
+  // defaults.b not selectable
+  // changed.b  not selectable
   _CREATE_MANUAL(_debug,    b, "Debug?");
+  // anchorX.i  chosen via keypress
+  // anchorY.i  chosen via keypress
   _CREATE_SELECT(_anchorN,  i, "Anchor note:", dropdown_notes);
   _CREATE_MANUAL(_anchorC,  d, "+/- cents:");
   _CREATE_SELECT(_txposeS,  i, "Transpose:",   spin_n127_127);
   _CREATE_MANUAL(_txposeC,  d, "cents: ");
+  _CREATE_SELECT(_axisA,    i, "Axis A:",      dropdown_dir);
+  _CREATE_SELECT(_axisB,    i, "Axis B:",      dropdown_dir);
   _CREATE_MANUAL(_equaveJI, b, "Equave in JI?");
   _CREATE_MANUAL(_equaveC,  d, "Cents:");
   _CREATE_SELECT(_equaveN,  i, "Numerator:",   spin_1_255);
   _CREATE_SELECT(_equaveD,  i, "Denominator:", spin_1_255);
-  _CREATE_SELECT(_axisA,    i, "Axis A:",      dropdown_dir);
-  _CREATE_SELECT(_axisB,    i, "Axis B:",      dropdown_dir);
+  // tuneSys.i is complicated
   _CREATE_SELECT(_eqDivs,   i, "Equal div's:", spin_1_255);
   _CREATE_SELECT(_eqStepA,  i, "Axis A steps", spin_n127_127);
   _CREATE_SELECT(_eqStepB,  i, "Axis B steps", spin_n127_127);
@@ -282,55 +613,45 @@ void create_menu_items_for_user_settings() {
   _CREATE_SELECT(_JIdenA,   i, "Denominator:", spin_1_255);
   _CREATE_SELECT(_JInumB,   i, "Numerator:",   spin_1_255);
   _CREATE_SELECT(_JIdenB,   i, "Denominator:", spin_1_255);
+  _CREATE_MANUAL(_scaleLck, b, "Scale lock");
+  _CREATE_SELECT(_animFPS,  i, "LED refresh Hz", dropdown_fps);
+  _CREATE_SELECT(_palette,  i, "Palette", dropdown_palette);
   _CREATE_SELECT(_animType, i, "Animation:",   dropdown_anim);
   _CREATE_SELECT(_globlBrt, i, "Brightness:",  dropdown_bright);
+  _CREATE_MANUAL(_hueLoop,  d, "Seconds:");
   _CREATE_MANUAL(_tglWheel, b, "Wheel toggle");
   _CREATE_MANUAL(_whlMode,  b, "Fine tune?");
   _CREATE_MANUAL(_mdSticky, b, "Mod sticky?");
   _CREATE_MANUAL(_pbSticky, b, "PB sticky?");
   _CREATE_MANUAL(_vlSticky, b, "Vel sticky?");
-
-
+  _CREATE_SELECT(_mdSpeed,  i, "Mod speed:", dropdown_speed);
+  _CREATE_SELECT(_pbSpeed,  i, "PB speed:",  dropdown_speed);
+  _CREATE_SELECT(_vlSpeed,  i, "Vel speed:", dropdown_speed);
+  _CREATE_MANUAL(_rotInv,   b, "Knob invert");
+  _CREATE_SELECT(_rotDblCk, i, "DblClk in ms", spin_100_1k);
+  _CREATE_SELECT(_rotLongP, i, "LongPr in ms", spin_500_2k);
+  _CREATE_SELECT(_SStime,   i, "ScrSvr in sec", spin_1_255);
+  _CREATE_SELECT(_MIDImode, i, "", dropdown_MIDImode);
+  _CREATE_MANUAL(_MIDIusb,  b, "USB port");
+  _CREATE_MANUAL(_MIDIjack, b, "Serial port");
   _CREATE_SELECT(_MPEzoneC, i, "", dropdown_MPE);
   _CREATE_SELECT(_MPEzoneL, i, "", dropdown_MPE_left);
   _CREATE_SELECT(_MPEzoneR, i, "", dropdown_MPE_right);
-
-
-  _CREATE_MANUAL(_scaleLck, b, "Scale lock");
-  _CREATE_SELECT(_animFPS,  i, "LED refresh Hz", dropdown_fps);
-  _CREATE_MANUAL(_rotInv,   b, "Knob invert");
-
-  _CREATE_MANUAL(_synthBuz, b, "Piezo");
-  _CREATE_MANUAL(_synthJac, b, "Audio jack");
-
-/*
-  refS[_palette].i  = _palette_rainbow;
-  refS[_hueLoop].d  = 30.0;  // seconds for 360 degrees 
-
-  refS[_tglWheel].b = false; // bool; 0 = mod, 1 = pb
-  refS[_whlMode].b  = false; // standard vs. fine tune mode
-  refS[_mdSticky].b = false;
-  refS[_pbSticky].b = false;
-  refS[_vlSticky].b = false;
-  refS[_mdSpeed].i  = 8;
-  refS[_pbSpeed].i  = 8; // scale by x128
-  refS[_vlSpeed].i  = 8;		
-  refS[_rotInv].b   = (version >= 12 ? true : false);
-  refS[_SStime].i   = 10; // seconds
-  refS[_MIDImode].i = _MIDImode_standard;
-  refS[_MPEpb].i    = 48; // 2, 12, 24, 48, or 96
-  refS[_MIDIout].i  = (version = 12 ? _MIDIout_both : _MIDIout_USB);
-  refS[_MIDIpc].i   = 0; // program chg 1 - 128
-  refS[_synthTyp].i = _synthTyp_poly;
-  refS[_synthWav].i = _synthWav_hybrid;
-  refS[_synthOut].i = (version >= 12 ? _synthOut_both : _synthOut_piezo);
-*/
-
+  _CREATE_SELECT(_MPEpb,    i, "", dropdown_MPE_PB);
+  _CREATE_SELECT(_MIDIorMT, i, "", dropdown_instruments);
+  _CREATE_SELECT(_MIDIpc,   i, "", dropdown_gm);
+  _CREATE_SELECT(_MT32pc,   i, "", dropdown_mt32);
+  _CREATE_SELECT(_synthTyp, i, "Playback", dropdown_synth_mode);
+  _CREATE_SELECT(_synthWav, i, "Waveform",   dropdown_wave);
+  _CREATE_SELECT(_synthEnv, i, "Envelope",   dropdown_adsr);
+  // _synthVol.i set via control
+  _CREATE_MANUAL(_synthBuz, b, "Use piezo?");
+  _CREATE_MANUAL(_synthJac, b, "Use jack?");
 }
 
 void populate_menu_structure() {
 	pgHome // main menu contains links to pages
-		.addMenuItem(*new GEMItem("Layout", pgLayout))
+		.addMenuItem(*new GEMItem("Layout",   pgLayout))
 		.addMenuItem(*new GEMItem("Playback", pgPlayback))
 		.addMenuItem(*new GEMItem("Hardware", pgHardware))
 		.addMenuItem(*new GEMItem("Software", pgSoftware))
@@ -347,45 +668,84 @@ void populate_menu_structure() {
     .addMenuItem(*new GEMItem("...by lg/sm steps",   onSelect_generate, _tuneSys_lg_sm))
     .addMenuItem(*new GEMItem("...as a JI lattice",  onSelect_generate, _tuneSys_just))
     ;
-  pgTuning //
-    .setParentMenuPage(pgLayout)
-    .addMenuItem(*menuItem[_equaveJI]) 
-    .addMenuItem(*menuItem[_equaveN] ) .addMenuItem(*menuItem[_equaveC] ) 
-    .addMenuItem(*menuItem[_equaveD] ) .addMenuItem(spacer_1) 
-    .addMenuItem(*menuItem[_lgSteps] ) .addMenuItem(*menuItem[_eqDivs]  )
-    .addMenuItem(*menuItem[_smSteps] )
-    .addMenuItem(*menuItem[_lgToSm]  ) 
-    .addMenuItem(*menuItem[_modeLgSm])
-    .addMenuItem(*new GEMItem(">> Continue", pgGenerate))
-    ;
-  pgGenerate
-    .setParentMenuPage(pgLayout)
-    .addMenuItem(*menuItem[_axisA]   )
-    .addMenuItem(*menuItem[_axisB]   )
-    .addMenuItem(*menuItem[_lgStepA] ) .addMenuItem(*menuItem[_JInumA] ) .addMenuItem(*menuItem[_eqStepA] ) 
-    .addMenuItem(*menuItem[_smStepA] ) .addMenuItem(*menuItem[_JIdenA] ) .addMenuItem(*menuItem[_eqStepB] )
-    .addMenuItem(*menuItem[_lgStepB] ) .addMenuItem(*menuItem[_JInumB] ) 
-    .addMenuItem(*menuItem[_smStepB] ) .addMenuItem(*menuItem[_JIdenB] )
-    .addMenuItem(*new GEMItem(">> Continue", pgAnchor))
-    ;
-  pgAnchor
-    .addMenuItem(*menuItem[_anchorN])
-    .addMenuItem(*menuItem[_anchorC])
-    .addMenuItem(*menuItem[_txposeS])
-    ;
-
+    pgTuning // first page of layout application
+      .addMenuItem(*menuItem[_equaveJI]) 
+      .addMenuItem(*menuItem[_equaveN] ) .addMenuItem(*menuItem[_equaveC] ) 
+      .addMenuItem(*menuItem[_equaveD] ) .addMenuItem(spacer_1) 
+      .addMenuItem(*menuItem[_lgSteps] ) .addMenuItem(*menuItem[_eqDivs]  )
+      .addMenuItem(*menuItem[_smSteps] )
+      .addMenuItem(*menuItem[_lgToSm]  ) 
+      .addMenuItem(*menuItem[_modeLgSm])
+      .addMenuItem(*new GEMItem(">> Continue", pgGenerate))
+      ;
+    pgGenerate // second page of layout application
+      .addMenuItem(*menuItem[_axisA]   )
+      .addMenuItem(*menuItem[_axisB]   )
+      .addMenuItem(*menuItem[_lgStepA] ) .addMenuItem(*menuItem[_JInumA] ) .addMenuItem(*menuItem[_eqStepA] ) 
+      .addMenuItem(*menuItem[_smStepA] ) .addMenuItem(*menuItem[_JIdenA] ) .addMenuItem(*menuItem[_eqStepB] )
+      .addMenuItem(*menuItem[_lgStepB] ) .addMenuItem(*menuItem[_JInumB] ) 
+      .addMenuItem(*menuItem[_smStepB] ) .addMenuItem(*menuItem[_JIdenB] )
+      .addMenuItem(*new GEMItem(">> Continue", pgAnchor))
+      ;
+    pgAnchor // last page of layout application
+      .addMenuItem(*menuItem[_anchorN])
+      .addMenuItem(*menuItem[_anchorC])
+      .addMenuItem(*menuItem[_txposeS])
+      .addMenuItem(*new GEMItem(">> Generate!!", onComplete_generate))
+      ;
   pgPlayback
-		.addMenuItem(*menuItem[_scaleLck])
-    .addMenuItem(*menuItem[_MPEzoneC])
-    .addMenuItem(*menuItem[_MPEzoneL])
-    .addMenuItem(*menuItem[_MPEzoneR])
-    .addMenuItem(*menuItem[_synthBuz])
-    .addMenuItem(*menuItem[_synthJac])
+    .addMenuItem(*new GEMItem("MIDI...", pgMIDI))
+    .addMenuItem(*new GEMItem("Synth...", pgSynth))
+    .addMenuItem(*menuItem[_scaleLck])
     ;
+    pgMIDI
+      .addMenuItem(*new GEMItem("MIDI out ports...", pgMIDIout))
+      .addMenuItem(*menuItem[_MIDIorMT])
+      .addMenuItem(*menuItem[_MIDIpc])   .addMenuItem(*menuItem[_MT32pc])
+      .addMenuItem(*menuItem[_MIDImode])
+      .addMenuItem(*menuItem[_MPEzoneC])
+      .addMenuItem(*menuItem[_MPEzoneL])
+      .addMenuItem(*menuItem[_MPEzoneR])
+      .addMenuItem(*menuItem[_MPEpb])
+      ;
+      pgMIDIout
+        .addMenuItem(*menuItem[_MIDIusb])
+        .addMenuItem(*menuItem[_MIDIjack])
+        ;
+    pgSynth
+      .addMenuItem(*menuItem[_synthTyp])
+      .addMenuItem(*menuItem[_synthWav])
+      .addMenuItem(*menuItem[_synthEnv])
+      .addMenuItem(*menuItem[_synthBuz])
+      .addMenuItem(*menuItem[_synthJac])
+      ;
   pgHardware
-		.addMenuItem(*menuItem[_rotInv])
+    .addMenuItem(*new GEMItem("Rotary...", pgRotary))
+    .addMenuItem(*new GEMItem("Command keys...", pgCommand))
+    .addMenuItem(*new GEMItem("Display...", pgOLED))
     ;
+    pgRotary
+      .addMenuItem(*menuItem[_rotInv])
+      .addMenuItem(*menuItem[_rotDblCk])
+      .addMenuItem(*menuItem[_rotLongP])
+      ;
+    pgCommand
+      .addMenuItem(*menuItem[_tglWheel])
+      .addMenuItem(*menuItem[_whlMode])
+      .addMenuItem(*menuItem[_mdSticky])
+      .addMenuItem(*menuItem[_pbSticky])
+      .addMenuItem(*menuItem[_vlSticky])
+      .addMenuItem(*menuItem[_mdSpeed])
+      .addMenuItem(*menuItem[_pbSpeed])
+      .addMenuItem(*menuItem[_vlSpeed])
+      ;
+    pgOLED
+      .addMenuItem(*menuItem[_SStime])
+      ;
+
+
   pgSoftware
+    .setParentMenuPage(pgHome)
 		.addMenuItem(*menuItem[_debug])
     ;
 }

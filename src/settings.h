@@ -7,6 +7,13 @@
 // and for processing menu callbacks efficiently (you can cast as integer)
 // while also being very legible (settings[_settingName] returns correct array member)
 
+// if you change the list of settings,
+// make sure also to change:
+// * defaults in this file
+// * menu item creation in <menu.h>
+// * onChg handlers in <menu.h>
+// * applying settings in main
+
 enum {
   _defaults, // is this the factory default set?
   _changed,  // has this changed since last save?
@@ -20,7 +27,6 @@ enum {
   _axisA,    // one of 6 directions
   _axisB,    // one of 6 directions
   _equaveJI, //
-  _equaveS,  //
   _equaveC,  //
   _equaveN,  //
   _equaveD,  //
@@ -58,16 +64,19 @@ enum {
   _rotDblCk, //
   _rotLongP, //
   _SStime,   //
-  _SSctrst,  //
   _MIDImode, //
+  _MIDIusb,  //
+  _MIDIjack, //
   _MPEzoneC, //
   _MPEzoneL, //
   _MPEzoneR, //
   _MPEpb,    //
-  _MIDIout,  //
+  _MIDIorMT, //
   _MIDIpc,   //
+  _MT32pc,   //
   _synthTyp, //
   _synthWav, //
+  _synthEnv, //
   _synthVol, //
   _synthBuz, //
   _synthJac, //
@@ -115,12 +124,6 @@ enum {
   _MIDImode_2_point_oh
 };
 enum {
-  _MIDIout_none,
-  _MIDIout_USB,
-  _MIDIout_serial,
-  _MIDIout_both
-};
-enum {
   _synthTyp_off,
   _synthTyp_mono,
   _synthTyp_arpeggio,
@@ -135,7 +138,18 @@ enum {
   _synthWav_strings,
   _synthWav_clarinet
 };
-
+enum {
+  _synthEnv_none,
+  _synthEnv_hit,
+  _synthEnv_pluck,
+  _synthEnv_strum,
+  _synthEnv_slow,
+  _synthEnv_reverse
+};
+enum {
+  _GM_instruments,
+  _MT32_instruments
+};
 
 // this is a simple kind of "variant" type.
 // it holds the bit-wise representation of
@@ -208,14 +222,18 @@ void load_factory_defaults_to(hexBoard_Setting_Array& refS, int version = 0) {
   refS[_rotLongP].i = 750; // milliseconds
   refS[_SStime].i   = 10; // seconds
   refS[_MIDImode].i = _MIDImode_standard;
+  refS[_MIDIusb].b  = true;
+  refS[_MIDIjack].b = (version >= 12);
   refS[_MPEzoneC].i = 2;
   refS[_MPEzoneL].i = 9;
   refS[_MPEzoneR].i = 11;
   refS[_MPEpb].i    = 48; // 2, 12, 24, 48, or 96
-  refS[_MIDIout].i  = (version >= 12 ? _MIDIout_both : _MIDIout_USB);
-  refS[_MIDIpc].i   = 0; // program chg 1 - 128
+  refS[_MIDIorMT].i = _GM_instruments;
+  refS[_MIDIpc].i   = 1; // program chg 1 - 128
+  refS[_MT32pc].i   = 1;
   refS[_synthTyp].i = _synthTyp_poly;
   refS[_synthWav].i = _synthWav_hybrid;
+  refS[_synthEnv].i = _synthEnv_none;
   refS[_synthVol].i = 96;
   refS[_synthBuz].b = true;
   refS[_synthJac].b = (version >= 12);

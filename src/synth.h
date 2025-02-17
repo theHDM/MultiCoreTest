@@ -20,135 +20,242 @@
 #include "pico/time.h"
 #include "config.h" // import hardware config constants
 
-using wave_tbl = std::array<int8_t, 256>;
+enum class ADSR_Phase {
+  off, attack, decay, sustain, release
+};
 
-//
-// Linear waveforms such as square, saw, and triangle waves
-// can be generalized in the form A,B,C,D, as follows
-//
-// 255|   B ******* C       from sample 0 to A,   level is 0
-//    |     *      *        from sample A to B,   level rises
-// lvl|    *        *       from sample B to C,   level is 255
-//    |    *         *      from sample C to D,   level falls
-// 0  |**** A       D ***** from sample D to 255, level is 0
-//    ---------------------  rising from A to B has a slope of AB
-//    0     sample      255 falling from C to D has a slope of CD
-//
+struct Synth_Voice {
+  int8_t wavetable[256];
+  uint32_t pitch_as_increment;
+  uint8_t base_volume;
+  uint32_t attack; // express in # of samples
+  uint32_t decay;  // express in # of samples
+  uint8_t sustain; // express from 0-255
+  uint32_t release; // express in # of samples
 
+  uint32_t loop_counter;
+  int32_t envelope_counter; // used to apply envelope
+  uint8_t envelope_level; // stored to ensure even fade at release
+  ADSR_Phase phase;  
+  uint32_t attack_inverse;
+  uint32_t decay_inverse;
+  uint32_t release_inverse;
+  uint8_t  ownership;
 
-const float f_hyb_square   =  220.f;
-const float f_hyb_saw_low  =  440.f;
-const float f_hyb_saw_high =  880.f;
-const float f_hyb_triangle = 1760.f;
-enum class Linear_Wave {square, saw, triangle, hybrid};
+  // define a series of setter functions for core0
+  // which will block if core1 is trying to calculate
+  // the next sample.
+  void update_wavetable(std::array<int8_t,256> tbl) {
+    while (ownership == 1) {}
+    ownership = 0;
+    for (size_t i = 0; i <  256; ++i) {
+      wavetable[i] = tbl[i];
+    }
+    ownership = -1;
+  }
+  void update_pitch(uint32_t increment) {
+    while (ownership == 1) {}
+    ownership = 0;
+    pitch_as_increment = increment;
+    ownership = -1;
+  }
+  void update_base_volume(uint8_t volume) {
+    while (ownership == 1) {}
+    ownership = 0;
+    base_volume = volume;
+    ownership = -1;
+  }
+  void update_envelope(uint32_t a, uint32_t d, uint8_t s, uint32_t r) {
+    while (ownership == 1) {}
+    ownership = 0;
+    attack = a * 1000 / audio_sample_interval_uS;
+    decay = d * 1000 / audio_sample_interval_uS;
+    sustain = s;
+    release = r * 1000 / audio_sample_interval_uS;
+    attack_inverse  = !attack ? 0 : 0xFFFFFFFF / attack;
+    decay_inverse   = !decay ? 0 : ((256 - sustain) << 24) / decay;
+    release_inverse = !release ? 0 : (sustain << 24) / release;
+    ownership = -1;
+  }
+  void note_on() {
+    while (ownership == 1) {}
+    ownership = 0;
+    envelope_counter = 0;
+    phase = ADSR_Phase::attack;
+    ownership = -1;
+  }
+  void note_off() {
+    while (ownership == 1) {}
+    ownership = 0;
+    phase = ADSR_Phase::release;
+    envelope_counter = 0;
+    if (envelope_level != sustain) {
+       envelope_counter = round((1.f - ((float)envelope_level / sustain)) * release);
+    }
+  }
+  // called from core 1 only
+  int32_t next_sample() {
+    while (ownership == 0) {}
+    ownership = 1;
+    loop_counter += pitch_as_increment;
+    int8_t sample = wavetable[loop_counter >> 24];
+    switch (phase) {
+      case ADSR_Phase::attack:
+        if (envelope_counter == attack) {
+          phase = ADSR_Phase::decay;
+          envelope_counter = 0;
+          envelope_level = 255;
+        } else {
+          ++envelope_counter;
+          envelope_level = (envelope_counter * attack_inverse) >> 24; 
+        }
+        break;
+      case ADSR_Phase::decay:
+        if (envelope_counter >= decay) {
+          phase = ADSR_Phase::sustain;
+          envelope_counter = 0;
+          envelope_level = sustain;
+        } else {
+          ++envelope_counter;
+          envelope_level = 255 - ((envelope_counter * decay_inverse) >> 24); 
+        }
+        break;
+      case ADSR_Phase::sustain: 
+        envelope_level = sustain;
+        break;
+      case ADSR_Phase::release:
+        if (envelope_counter == release) {
+          phase = ADSR_Phase::off;
+          envelope_level = 0;
+        } else {
+          ++envelope_counter;
+          envelope_level = sustain - ((envelope_counter * release_inverse) >> 24); 
+        }
+    }
+    ownership = -1;
+    return (sample * base_volume * envelope_level) >> 8;
+  }
+};
 
-wave_tbl linear_waveform(double _f, Linear_Wave _shp, uint8_t _mod) {
-  Linear_Wave m_shp = _shp;
-  float t_pct = 0.f;
-  if (_shp == Linear_Wave::hybrid) {
-    if (_f < f_hyb_saw_low) {
-      m_shp = Linear_Wave::square;
-      if (_f > f_hyb_square) {
-        t_pct =  (_f - f_hyb_square) / (f_hyb_saw_low - f_hyb_square);
+struct hexBoard_Synth_Object {
+  bool active;
+  std::array<Synth_Voice, synth_polyphony_limit> voice;
+  std::vector<uint8_t> pins;
+  bool pin_status[GPIO_pin_count];
+  pwm_config cfg;
+  uint8_t ownership;
+  uint16_t baseline_level;
+
+  void internal_set_pin(uint8_t pin, bool activate) {
+    auto n = std::find(pins.begin(), pins.end(), pin);
+    if (n == pins.end()) pins.emplace_back(pin);
+      pin_status[pin] = activate;
+  }
+
+  hexBoard_Synth_Object(const uint8_t* pins, size_t count)
+  : active(false) {
+    for (size_t i = 0; i < GPIO_pin_count; ++i) {
+      pin_status[i] = false;
+    }
+    for (size_t i = 0; i < count; ++i) {
+      internal_set_pin(pins[i], true);
+    }
+  }
+  void start() {active = true;}
+  void stop() {active = false;}
+
+  void set_pin(uint8_t pin, bool activate) {
+    while (ownership == 1) {}
+    ownership = 0;
+    internal_set_pin(pin, activate);
+    ownership = -1;
+  }
+
+  void poll() {
+    if (!active) return;
+    int32_t mixLevels = 0;
+    while (ownership == 0) {}
+    bool anyVoicesOn = false;
+    for (auto& v : voice) {
+      if (v.phase == ADSR_Phase::off) continue;
+      if (!v.base_volume) continue;
+
+      anyVoicesOn = true;
+      mixLevels += v.next_sample();
+    }
+    if (anyVoicesOn) {
+      // waveform formula:
+      // amplitude ~ sqrt(10^(dB/10))
+      // dB ~ 2 * 10 * log10(level/max_level)
+      // 24 bits per voice (1 << 24)
+      // if there are 8 voices at max, clip possible at (8 << 24)
+      // level  1   2   3   4   5   6   7   8
+      // dB   -18 -12  -9  -6  -4 -2.5 -1  0
+      // compression of 3:1 
+      // dB   -6  -4   -3  -2  -1.4 -0.8 -0.4 0
+      // level 4   5   5.7 6.4 6.8  7.3  7.7  8
+      // lvl/255 = old lvl/255 ^ 1/3
+      // this formula is a dirty linear estimate of ^1/3 that
+      // also scales the level down to the right # of bits
+      // 
+      // Compression = lvl<25% ? lvl*1403/512 : [297 + 315*lvl] /512
+      mixLevels /= synth_polyphony_limit;
+      if (std::abs(mixLevels) < (1u << 13)) {
+        mixLevels *= 1403;
+      } else {
+        mixLevels *= 315;
+        mixLevels += 297;
       }
-    } else if (_f > f_hyb_saw_high) {
-      m_shp = Linear_Wave::triangle;
-      if (_f < f_hyb_triangle) {
-        t_pct = (f_hyb_triangle - _f) / (f_hyb_triangle - f_hyb_saw_high);
+      mixLevels >>= 25 - audio_bits;
+      mixLevels += neutral_level;
+      if (baseline_level < neutral_level) {
+        ++baseline_level;
+        mixLevels *= baseline_level;
+        mixLevels /= neutral_level;
       }
     } else {
-      m_shp = Linear_Wave::saw;
+      if (baseline_level) --baseline_level;
+        mixLevels = baseline_level;
     }
-  }
-  uint8_t d_cyc = 127 - _mod;
-  uint8_t a;
-  uint8_t b;
-  uint8_t c;
-  uint8_t d;  
-  switch (m_shp) {
-    case Linear_Wave::square: {
-      a = (d_cyc * (1.f - t_pct)) - 1;
-      b = (d_cyc * (1.f + t_pct));
-      c = (d_cyc << 1) - 1;
-      d = c + 1;
+    ownership = 1;
+    for (size_t i = 0; i < pins.size(); ++i) {
+      pwm_set_gpio_level(pins[i], (pin_status[pins[i]]) ? mixLevels : 0);
     }
-    case Linear_Wave::saw: {
-      a =  0;
-      b = (d_cyc << 1) - 1;
-      c = (d_cyc << 1) - 1;
-      d = c + 1;
-    }
-    case Linear_Wave::triangle: {
-      a =  0;
-      b =  d_cyc * (2.f - t_pct);
-      c =  b;
-      d = (d_cyc << 1);
-    }
+    ownership = -1;
   }
-  wave_tbl result;
-  for (uint8_t i = 0; i <= a; ++i) {
-    result[i] = -127;
-  }
-  if (a < b - 1) {
-    for (uint8_t i = a + 1; i <= b - 1; ++i) {
-      result[i] = (((i - a) * ((254 << 8) / (b - 1 - a))) >> 8) - 127;
-    }
-  }
-  for (uint8_t i = b; i <= c; ++i) {
-    result[i] = 127;
-  }
-  if (c < d - 1) {
-    for (uint8_t i = c + 1; i <= d - 1; ++i) {
-      result[i] = (((d - i) * ((254 << 8) / (d - 1 - c))) >> 8) - 127;
-    }
-  }
-  return result;
-}
 
-// calculated ahead of time by core0 for instruments made of harmonics
-// pass arrays containing the amount of each harmonic and the phase shift.
-// amt is from 0.0 - 1.0. phase shift is in multiples of 2pi, 
-// so 0.5 is negative sine, 0.25 is cosine, etc.
-const double pi = std::acos(-1);
-wave_tbl additive_synthesis(size_t harmonicLimit, float* amt, float* phase) {
-  float raw[256];
-  float normalize = 0;
-  for (uint8_t i = 0; i < 256; ++i) {
-    raw[i] = 0.0;
-    for (size_t h = 0; h < harmonicLimit; ++h) {
-      raw[i] += amt[i] * std::sin(2 * (h + 1) * pi * (phase[i] + (i / 256.f)));
+  void begin() {
+    cfg = pwm_get_default_config();
+    pwm_config_set_clkdiv(&cfg, 1.0f);
+    pwm_config_set_wrap(&cfg, (1u << audio_bits) - 2);
+    pwm_config_set_phase_correct(&cfg, true);
+    for (size_t i = 0; i < pins.size(); ++i) {
+      uint8_t p = pins[i];
+      uint8_t s = pwm_gpio_to_slice_num(p);
+      gpio_set_function(p, GPIO_FUNC_PWM);    // set that pin as PWM
+      pwm_init(s, &cfg, true);                // configure and start!
+      pwm_set_gpio_level(p, 0);               // initialize at zero to prevent whining sound
     }
-    if (std::abs(raw[i]) > normalize) {
-      normalize = std::abs(raw[i]);
-    }
+    start();
   }
-  normalize = 127 / normalize;
-  wave_tbl result;
-  for (uint8_t i = 0; i < 256; ++i) {
-    result[i] = round(raw[i] * normalize);
+};
+
+// core0 uses a queue to determine
+// how to assign voices to new notes
+queue_t open_synth_channel_queue;
+void reset_synth_channel_queue() {
+  uint8_t discard;
+  while (!queue_is_empty(&open_synth_channel_queue)) {
+    queue_try_remove(&open_synth_channel_queue, &discard);
   }
-  return result;
-}
+  uint8_t i = 1;
+  while (i <= synth_polyphony_limit) {
+    bool success = queue_try_add(&open_synth_channel_queue, &i);
+    i += (uint8_t)success;
+  }
 
-uint32_t frequency_to_interval(
-  const double&   frequency, 
-  const uint64_t& interval_in_uS) {
-  return lround(ldexp(frequency * interval_in_uS / 1000000.d, 32));
 }
-
-uint8_t iso226(const double& f) {
-  // a very crude implementation of ISO 226 equal loudness curves
-  //   Hz dB  Amplitude ~ sqrt(10^(dB/10))
-  //  200 +0  255
-  //  800 -3  191
-  // 1500 +0  255
-  // 3250 -6  127
-  // 5000 +0  255
-  if (f <      8.0) return 0;
-  if (f <    200.0) return 255;
-  if (f <   1500.0) return 191 + ldexp(abs(f- 800) /  700.d, 6);
-  if (f <   5000.0) return 127 + ldexp(abs(f-3250) / 1750.d, 7);
-  if (f < highest_MIDI_note_Hz) return 255;
-  return 0;
+void initialize_synth_channel_queue() {
+  queue_init(&open_synth_channel_queue, sizeof(uint8_t), synth_polyphony_limit);
+  reset_synth_channel_queue();
 }
-

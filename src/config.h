@@ -66,7 +66,7 @@ const uint8_t rotaryPinB = 21;
 const uint8_t rotaryPinC = 24;
 const uint8_t piezoPin = 23;
 const uint8_t audioJackPin = 25;
-const uint8_t synthPins[] = {audioJackPin};
+const uint8_t synthPins[] = {piezoPin, audioJackPin};
 const uint8_t ledPin = 22;
 const uint8_t OLED_sdaPin = 16;
 const uint8_t OLED_sclPin = 17;
@@ -91,7 +91,7 @@ const uint8_t  screensaver_contrast = 1; // range: 0-127
 
 const uint8_t synth_polyphony_limit = 16;
 const uint8_t audio_bits = 9;
-
+constexpr uint16_t neutral_level = (1u << (audio_bits - 1)) - 1;
 // names of the columns
 enum {
   _layout_table_column_pin,

@@ -94,6 +94,8 @@ struct hexBoard_Grid_Object {
   std::array<Button, keys_count> btn;
   std::map<Hex,      int16_t>    coord_to_pixel;
   std::map<uint8_t,  int16_t>    index_to_pixel;
+  wave_tbl                       cached_waveform;
+  
 
   hexBoard_Grid_Object(const int16_t layout[keys_count][_layout_table_size]) {
     // first count how many rows represent usable inputs,
@@ -171,4 +173,11 @@ struct hexBoard_Grid_Object {
   bool in_bounds(Hex& coord) {
     return (coord_to_pixel.find(coord) != coord_to_pixel.end());
   }
+
+  void set_cached_wavetable(wave_tbl inputWaveTbl) {
+    for (uint8_t i = 0; i < 256; ++i) {
+      cached_waveform[i] = inputWaveTbl[i];
+    }
+  }
+
 };

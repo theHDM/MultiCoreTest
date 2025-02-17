@@ -9,7 +9,7 @@ volatile int screenupdate = 0;
 hexBoard_Setting_Array settings;
 #include "src/file_system.h"
 
-#include "src/audio.h"
+#include "src/synth.h"
 hexBoard_Synth_Object  synth(synthPins, 2);
 #include "src/rotary.h"
 hexBoard_Rotary_Object rotary(rotaryPinA, rotaryPinB, rotaryPinC);
@@ -91,14 +91,96 @@ void link_settings_to_objects(hexBoard_Setting_Array& refS) {
   debug.setStatus(&refS[_debug].b);
   oled_screensaver.setDelay(&refS[_SStime].i);
 }
-/*
-void send_rotary_settings_from(hexBoard_Setting_Array& refS) {
-  rotary_setting_in.invert = settings[_rotInv].b;
-  rotary_setting_in.double_click_timing = (settings[_rotDblCk].i * 1000);
-  rotary_setting_in.long_press_timing = (settings[_rotLongP].i * 1000);
-  queue_add_blocking(&rotary_setting_queue, &rotary_setting_in);
+void set_audio_outs_from_settings(hexBoard_Setting_Array& refS) {
+  synth.set_pin(piezoPin, refS[_synthBuz].b);
+  synth.set_pin(audioJackPin, refS[_synthJac].b);
 }
-*/
+void calibrate_rotary_from_settings(hexBoard_Setting_Array& refS) {
+  rotary.recalibrate(refS[_rotInv].b, refS[_rotLongP].i, refS[_rotDblCk].i);
+}
+void pre_cache_synth_waveform(hexBoard_Setting_Array& refS) {
+  switch (refS[_synthWav].i) {
+    case _synthWav_square:
+      hexBoard.cached_waveform  = linear_waveform(1.f, Linear_Wave::square, 0);
+      break;
+    case _synthWav_saw:
+      hexBoard.cached_waveform = linear_waveform(1.f, Linear_Wave::saw, 0);
+      break;
+    case _synthWav_triangle:
+      hexBoard.cached_waveform = linear_waveform(1.f, Linear_Wave::triangle, 0);
+      break;
+    case _synthWav_sine:
+      hexBoard.cached_waveform = additive_synthesis(1, sineAmt, sinePhase);
+      break;
+    case _synthWav_strings:
+      hexBoard.cached_waveform = additive_synthesis(10, stringsAmt, stringsPhase);
+      break;
+    case _synthWav_clarinet:
+      hexBoard.cached_waveform = additive_synthesis(11, clarinetAmt, clarinetPhase);
+      break;
+    default:
+      break;
+  } 
+}
+
+void apply_settings_to_objects(hexBoard_Setting_Array& refS) {
+  set_audio_outs_from_settings(refS);
+  calibrate_rotary_from_settings(refS);
+  pre_cache_synth_waveform(refS); 
+}
+void menu_handler(int settingNumber) {
+  switch (settingNumber) {
+    case _run_routine_to_generate_layout:
+      // um, do that
+      break;
+    
+    case _txposeS: case _txposeC:
+      // recalculate pitches for everyone
+      break;
+    case _scaleLck:
+      // set scale lock as appropriate
+      break;
+    case _rotInv: case _rotDblCk: case _rotLongP:
+      calibrate_rotary_from_settings(settings);
+      break;
+    case _MIDIusb: case _MIDIjack:
+      // turn MIDI jacks on/off
+      break;    
+    case _synthBuz: case _synthJac:
+      set_audio_outs_from_settings(settings);
+      break;    
+    case _MIDIpc: case _MT32pc:
+      // send program change
+      break;
+    case _synthWav:
+      pre_cache_synth_waveform(settings); 
+      // precalculate active waveform and cache?
+      break;
+    /*
+    _animFPS,  //
+    _palette,  //
+    _animType, //
+    _globlBrt, //
+    _hueLoop,  //
+    _tglWheel, //
+    _whlMode,  //
+    _mdSticky, //
+    _pbSticky, //
+    _vlSticky, //
+    _mdSpeed,  //
+    _pbSpeed,  //
+    _vlSpeed,  //
+    _MIDImode, //
+    _MPEzoneC, //
+    _MPEzoneL, //
+    _MPEzoneR, //
+    _MPEpb,    //
+    _synthTyp, //
+    */
+    default: 
+      break;
+  }
+}
 
 
 void interpret_key_msg(Key_Msg& msg) {
@@ -121,15 +203,38 @@ void interpret_key_msg(Key_Msg& msg) {
           &(b->synthChPlaying)
         );
         Synth_Voice *v = &synth.voice[(b->synthChPlaying) - 1];
-        double adj_f = frequency_after_pitch_bend(b->frequency, 0, 2);
+        double adj_f = frequency_after_pitch_bend(b->frequency, 0 /*pb*/, 2 /*pb range*/);
         v->update_pitch(frequency_to_interval(adj_f, audio_sample_interval_uS));
-        v->update_wavetable(linear_waveform(adj_f, Linear_Wave::hybrid, 0));
+        if    ((settings[_synthWav].i == _synthWav_hybrid) || ( false /*mod > 0*/
+          &&  ((settings[_synthWav].i == _synthWav_square) 
+            || (settings[_synthWav].i == _synthWav_saw)
+            || (settings[_synthWav].i == _synthWav_triangle)
+        ))) {
+          v->update_wavetable(linear_waveform(adj_f, Linear_Wave::hybrid, 0 /*mod*/));
+        } else {
+          v->update_wavetable(hexBoard.cached_waveform);
+        }
         v->update_base_volume((settings[_synthVol].i * b->velocity * iso226(adj_f)) >> 15);
-        v->update_envelope(
-          1000000 / audio_sample_interval_uS,
-          1000000 / audio_sample_interval_uS,
-          212,
-          2500000 / audio_sample_interval_uS);
+        switch (settings[_synthEnv].i) {
+          case _synthEnv_hit:
+            v->update_envelope(20/*ms*/, 50/*ms*/, 128/*0-255*/, 100/*ms*/);
+            break;
+          case _synthEnv_pluck:
+            v->update_envelope(20/*ms*/, 1000/*ms*/, 24/*0-255*/, 100/*ms*/);
+            break;
+          case _synthEnv_strum:
+            v->update_envelope(50/*ms*/, 2000/*ms*/, 128/*0-255*/, 500/*ms*/);
+            break;
+          case _synthEnv_slow:
+            v->update_envelope(1000/*ms*/, 0/*ms*/, 255/*0-255*/, 1000/*ms*/);
+            break;
+          case _synthEnv_reverse:
+            v->update_envelope(2000/*ms*/, 0/*ms*/, 0/*0-255*/, 0/*ms*/);
+            break;
+          default:
+            v->update_envelope(0, 0, 255, 0);
+            break;
+        }
         v->note_on();
         break;
       }
@@ -263,14 +368,15 @@ void setup() {
   queue_init(&key_press_queue, sizeof(Key_Msg), keys_count + 1);
   queue_init(&rotary_action_queue,  sizeof(Rotary_Action),  32);
   load_factory_defaults_to(settings);
+  link_settings_to_objects(settings);
+
   mount_tinyUSB();
   connect_OLED_display(OLED_sdaPin, OLED_sclPin);
   connect_neoPixels(ledPin, ledCount);
   mount_file_system();  
-  link_settings_to_objects(settings);
   //if (!load_settings(settings)) { // attempt to load saved settings, and if not,  
   //}  
-  //  send_rotary_settings_from(settings);
+  calibrate_rotary_from_settings(settings);
   init_MIDI();
   initialize_synth_channel_queue();
   menu_setup();

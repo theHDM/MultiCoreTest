@@ -1,3 +1,18 @@
+/*  
+ *  HexBoard v1.2
+ */
+enum class App_state {  // OLED             LED         Audio        Keys       Knob
+  setup,                // splash/status    off         off          off        off
+  play_mode,            // full GUI         musical     active       play       control, hold for menu
+  menu_nav,             // menu             musical     active       play       menu, hold at home page to escape
+  edit_mode,            // menu->edit mode  edit mode   off          selection  menu
+  calibrate,            // TBD
+  data_mgmt,            // TBD
+  crash,                // display error    off         off          off        TBD
+  low_power,            // off              off         off          off        off, except hold to awake
+};
+App_state app_state = App_state::setup;
+
 #include <stdint.h>
 #include "pico/time.h"
 #include "src/config.h"
@@ -8,6 +23,7 @@ volatile int screenupdate = 0;
 #include "src/settings.h"
 hexBoard_Setting_Array settings;
 #include "src/file_system.h"
+const char* settingFileName = "temp222.dat";
 
 #include "src/synth.h"
 hexBoard_Synth_Object  synth(synthPins, 2);
@@ -38,8 +54,8 @@ void start_background_processes() {
   // enter a negative timer value here because the poll
   // should occur X microseconds after the routine starts
   alarm_pool_add_repeating_timer_us(core1pool, 
-    - static_cast<int64_t>(audio_sample_interval_uS), 
-    on_callback_synth, NULL, &timer_synth);
+    -audio_sample_interval_uS, on_callback_synth, 
+    NULL, &timer_synth);
 
   rotary.begin();
   struct repeating_timer timer_rotary;
@@ -71,6 +87,7 @@ hexBoard_Grid_Object   hexBoard(hexBoard_layout_v1_2);
 #include "src/LED.h"
 #include "src/OLED.h"
 OLED_screensaver       oled_screensaver(default_contrast, screensaver_contrast);
+
 #include "src/menu.h"
 #include "src/GUI.h"
 #include "src/layout.h"
@@ -381,19 +398,19 @@ void setup() {
   connect_OLED_display(OLED_sdaPin, OLED_sclPin);
   connect_neoPixels(ledPin, ledCount);
   mount_file_system();  
-  //if (!load_settings(settings)) { // attempt to load saved settings, and if not,  
+  //if (!load_settings(settings, settingFileName)) { // attempt to load saved settings, and if not,  
   //}  
   calibrate_rotary_from_settings(settings);
   init_MIDI();
   initialize_synth_channel_queue();
   menu_setup();
   add_repeating_timer_ms(
-    LED_poll_interval_mS, 
+    -LED_poll_interval_mS, 
     on_LED_frame_refresh, NULL, 
     &polling_timer_LED
   );
   add_repeating_timer_ms(
-    OLED_poll_interval_mS,
+    -OLED_poll_interval_mS,
     on_OLED_frame_refresh, NULL, 
     &polling_timer_OLED
   );

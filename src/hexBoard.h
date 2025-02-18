@@ -6,17 +6,7 @@
 #include "hexagon.h"
 #include "music.h"
 
-enum class App_state {  // OLED             LED         Audio        Keys       Knob
-  setup,                // splash/status    off         off          off        off
-  play_mode,            // full GUI         musical     active       play       control, hold for menu
-  menu_nav,             // menu             musical     active       play       menu, hold at home page to escape
-  edit_mode,            // menu->edit mode  edit mode   off          selection  menu
-  calibrate,            // TBD
-  data_mgmt,            // TBD
-  crash,                // display error    off         off          off        TBD
-  low_power,            // off              off         off          off        off, except hold to awake
-};
-App_state app_state = App_state::setup;
+
 /* serialize members with a !! */
 struct Button {
 /*!!*/  bool     isUsed = false;  // is it a button or a hardwired circuit
@@ -26,12 +16,7 @@ struct Button {
 /*!!*/  bool     isBtn  = false;  // is it a button not a hardwired circuit
 /*!!*/  Hex      coord  = {0,0};  // physical location
 /*!!*/  int16_t  pixel  = -1;     // the button's index in the grid, which is equal to its associated pixel number if it has one
-/*!!*/  uint32_t LEDcodeBase = 0; // for now
-/*!!*/  uint32_t LEDcodeAnim = 0; // calculate it once and store value, to make LED playback snappier 
-/*!!*/  uint32_t LEDcodePlay = 0; // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeRest = 0; // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeOff  = 0; // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeDim  = 0; // calculate it once and store value, to make LED playback snappier
+
 
 /*!!*/  bool     isNote = false;  // is it a music note object
 /*!!*/  uint8_t  midiCh = 0;      // what channel assigned (if not MPE mode)   [1..16]
@@ -41,10 +26,17 @@ struct Button {
 /*!!*/  bool     inScale = false; // for scale-lock purposes
 /*!!*/  double   midiPitch = 0.0; // pitch, 69 = A440, every 1.0 is 100.0 cents
 /*!!*/  double   frequency = 0.0; // equivalent of pitch in Hz
+/*!!*/  int8_t   paletteNum = 0;  // used for tiered key coloring
 
 /*!!*/  bool     isCmd  = false;  // is it a command button
 /*!!*/  uint8_t  cmd = 0;  // control parameter corresponding to this hex
 
+/*!!*/  uint32_t LEDcodeBase = 0; // for now
+/*!!*/  uint32_t LEDcodeAnim = 0; // calculate it once and store value, to make LED playback snappier 
+/*!!*/  uint32_t LEDcodePlay = 0; // calculate it once and store value, to make LED playback snappier
+/*!!*/  uint32_t LEDcodeRest = 0; // calculate it once and store value, to make LED playback snappier
+/*!!*/  uint32_t LEDcodeOff  = 0; // calculate it once and store value, to make LED playback snappier
+/*!!*/  uint32_t LEDcodeDim  = 0; // calculate it once and store value, to make LED playback snappier
   uint32_t timeLastUpdate = 0; // store time that key level was last updated
   uint32_t timePressBegan = 0; // store time that full press occurred
   uint32_t timeHeldSince  = 0;
@@ -163,6 +155,7 @@ struct hexBoard_Grid_Object {
           break;
       }
     }
+    
     btn[0].LEDcodeBase = 0x010000;
     btn[20].LEDcodeBase = 0x010100;
     btn[40].LEDcodeBase = 0x000100;
@@ -185,33 +178,31 @@ struct hexBoard_Grid_Object {
     btn[23].LEDcodeBase = 0x020002;
     btn[24].LEDcodeBase = 0x020001;
     btn[25].LEDcodeBase = 0x020000;
-btn[31].LEDcodeBase = 0x030000;
-btn[32].LEDcodeBase = 0x030100;
-btn[33].LEDcodeBase = 0x030200;
-btn[34].LEDcodeBase = 0x030300;
-btn[35].LEDcodeBase = 0x020300;
-btn[36].LEDcodeBase = 0x010300;
-btn[37].LEDcodeBase = 0x000300;
-btn[41].LEDcodeBase = 0x000300;
-btn[42].LEDcodeBase = 0x000301;
-btn[43].LEDcodeBase = 0x000302;
-btn[44].LEDcodeBase = 0x000303;
-btn[45].LEDcodeBase = 0x000203;
-btn[46].LEDcodeBase = 0x000103;
-btn[47].LEDcodeBase = 0x000003;
-btn[51].LEDcodeBase = 0x000003;
-btn[52].LEDcodeBase = 0x010003;
-btn[53].LEDcodeBase = 0x020003;
-btn[54].LEDcodeBase = 0x030003;
-btn[55].LEDcodeBase = 0x030002;
-btn[56].LEDcodeBase = 0x030001;
-btn[57].LEDcodeBase = 0x030000;
-
-
+    btn[31].LEDcodeBase = 0x030000;
+    btn[32].LEDcodeBase = 0x030100;
+    btn[33].LEDcodeBase = 0x030200;
+    btn[34].LEDcodeBase = 0x030300;
+    btn[35].LEDcodeBase = 0x020300;
+    btn[36].LEDcodeBase = 0x010300;
+    btn[37].LEDcodeBase = 0x000300;
+    btn[41].LEDcodeBase = 0x000300;
+    btn[42].LEDcodeBase = 0x000301;
+    btn[43].LEDcodeBase = 0x000302;
+    btn[44].LEDcodeBase = 0x000303;
+    btn[45].LEDcodeBase = 0x000203;
+    btn[46].LEDcodeBase = 0x000103;
+    btn[47].LEDcodeBase = 0x000003;
+    btn[51].LEDcodeBase = 0x000003;
+    btn[52].LEDcodeBase = 0x010003;
+    btn[53].LEDcodeBase = 0x020003;
+    btn[54].LEDcodeBase = 0x030003;
+    btn[55].LEDcodeBase = 0x030002;
+    btn[56].LEDcodeBase = 0x030001;
+    btn[57].LEDcodeBase = 0x030000;
 
   }
 
-  Button& button_at_coord(Hex& coord) {
+  Button& button_at_coord(const Hex& coord) {
     return btn[coord_to_pixel.at(coord)];
   }
 
@@ -219,11 +210,11 @@ btn[57].LEDcodeBase = 0x030000;
     return btn[index_to_pixel.at(l_index)];
   }
 
-  bool in_bounds(Hex& coord) {
+  bool in_bounds(const Hex& coord) {
     return (coord_to_pixel.find(coord) != coord_to_pixel.end());
   }
 
-  void set_cached_wavetable(wave_tbl inputWaveTbl) {
+  void set_cached_wavetable(const wave_tbl& inputWaveTbl) {
     for (uint8_t i = 0; i < 256; ++i) {
       cached_waveform[i] = inputWaveTbl[i];
     }

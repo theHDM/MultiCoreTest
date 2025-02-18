@@ -17,7 +17,7 @@ struct hexBoard_Debug_Object {
     if (_ptrIsOn == nullptr) return false;
     return !(*_ptrIsOn);
   }
-  void add(std::string s, bool core1 = false) {    
+  void add(const std::string& s, bool core1 = false) {    
     if (isOff()) return;
     while (ownership == (core1 ? 1 : 2)) {}
     ownership = (core1 ? 2 : 1);

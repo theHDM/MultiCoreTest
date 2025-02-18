@@ -25,7 +25,7 @@ struct GEMPagePublic : public GEMPage {
   : GEMPage(title_), GUI_context(GUI_context_) {
     initialize_appearance(titleRows_, menuItemsPerScreen_, valueMargin_);
   }
-  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_, GEMPage& parentMenuPage_)
+  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_, const GEMPage& parentMenuPage_)
   : GEMPage(title_, parentMenuPage_), GUI_context(GUI_context_) {
     initialize_appearance(titleRows_, menuItemsPerScreen_, valueMargin_);
   }

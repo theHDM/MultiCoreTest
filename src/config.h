@@ -71,16 +71,16 @@ const uint8_t ledPin = 22;
 const uint8_t OLED_sdaPin = 16;
 const uint8_t OLED_sclPin = 17;
 
-const uint32_t highest_MIDI_note_Hz = 13'290;
+const uint32_t highest_MIDI_note_Hz = 13290;
 const uint32_t target_sample_rate_Hz = 2 * highest_MIDI_note_Hz;
-constexpr uint32_t audio_sample_interval_uS = 62'500 / (target_sample_rate_Hz >> 4);
-const uint32_t key_poll_interval_uS = 96;         // ideal is 1/16th microsecond so the whole thing is under 1 millisecond.
-const uint32_t rotary_poll_interval_uS = 768; // tested at 512 microseconds and it was too short
+constexpr int32_t audio_sample_interval_uS = 31250 / (target_sample_rate_Hz >> 5);
+const int32_t key_poll_interval_uS = 96;         // ideal is 1/16th microsecond so the whole thing is under 1 millisecond.
+const int32_t rotary_poll_interval_uS = 768; // tested at 512 microseconds and it was too short
 
 const uint8_t LED_frame_rate_Hz = 60;
 const uint8_t OLED_frame_rate_Hz = 24;
-constexpr uint32_t LED_poll_interval_mS = 1'000 / LED_frame_rate_Hz;
-constexpr uint32_t OLED_poll_interval_mS = 1'000 / OLED_frame_rate_Hz;
+constexpr int32_t LED_poll_interval_mS = 1'000 / LED_frame_rate_Hz;
+constexpr int32_t OLED_poll_interval_mS = 1'000 / OLED_frame_rate_Hz;
 
 // TO-DO: test on hardware v2
 const uint16_t default_analog_calibration_up = 480;

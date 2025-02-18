@@ -3,7 +3,6 @@
 #include "LittleFS.h"       // code to use flash drive space as a file system -- not implemented yet, as of May 2024
 #include "debug.h"
 
-const char* settingFileName = "temp222.dat";
 bool fileSystemExists;
 
 void mount_file_system() {
@@ -15,9 +14,9 @@ void mount_file_system() {
   debug.add("That's odd, there was even a problem re-formatting.\n");
 }
 
-bool load_settings(hexBoard_Setting_Array& refS) {
+bool load_settings(hexBoard_Setting_Array& refS, const char* FN) {
   if (!fileSystemExists) return false;
-  File f = LittleFS.open(settingFileName,"r+");
+  File f = LittleFS.open(FN,"r+");
   if (!f) {
     debug.add("Settings file did not exist.\n");
     return false;
@@ -38,10 +37,10 @@ bool load_settings(hexBoard_Setting_Array& refS) {
   return true;
 }
 
-void save_settings(hexBoard_Setting_Array& refS) {
+void save_settings(hexBoard_Setting_Array& refS, const char* FN) {
   if (!refS[_changed].b) return;
   if (!fileSystemExists) return;
-  File f = LittleFS.open(settingFileName,"w+");
+  File f = LittleFS.open(FN,"w+");
   if (!f) {
     debug.add("An Error has occurred while saving settings\n");        
   }

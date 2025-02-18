@@ -9,7 +9,7 @@ uint64_t timeSinceLastKey = 0;
 const uint64_t pixelSaverTimeout = (1u << 31); // 2^31 microseconds ~ 36 minutes
 */
 
-void connect_neoPixels(unsigned pin, unsigned numLEDs) {
+void connect_neoPixels(uint8_t pin, size_t numLEDs) {
   strip.updateType(NEO_GRB + NEO_KHZ800);
   strip.updateLength(numLEDs);
   strip.setPin(pin);

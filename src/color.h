@@ -61,7 +61,7 @@ float srgb_transfer_function_inv(float a)
 	return .04045f < a ? powf((a + .055f) / 1.055f, 2.4f) : a / 12.92f;
 }
 
-Lab linear_srgb_to_oklab(RGB c)
+Lab linear_srgb_to_oklab(const RGB& c)
 {
 	float l = 0.4122214708f * c.r + 0.5363325363f * c.g + 0.0514459929f * c.b;
 	float m = 0.2119034982f * c.r + 0.6806995451f * c.g + 0.1073969566f * c.b;
@@ -78,7 +78,7 @@ Lab linear_srgb_to_oklab(RGB c)
 	};
 }
 
-RGB oklab_to_linear_srgb(Lab c)
+RGB oklab_to_linear_srgb(const Lab& c)
 {
 	float l_ = c.L + 0.3963377774f * c.a + 0.2158037573f * c.b;
 	float m_ = c.L - 0.1055613458f * c.a - 0.0638541728f * c.b;
@@ -274,7 +274,7 @@ float find_gamut_intersection(float a, float b, float L1, float C1, float L0)
 	return find_gamut_intersection(a, b, L1, C1, L0, cusp);
 }
 
-RGB gamut_clip_preserve_chroma(RGB rgb)
+RGB gamut_clip_preserve_chroma(const RGB& rgb)
 {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
@@ -296,7 +296,7 @@ RGB gamut_clip_preserve_chroma(RGB rgb)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_project_to_0_5(RGB rgb)
+RGB gamut_clip_project_to_0_5(const RGB& rgb)
 {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
@@ -318,7 +318,7 @@ RGB gamut_clip_project_to_0_5(RGB rgb)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_project_to_L_cusp(RGB rgb)
+RGB gamut_clip_project_to_L_cusp(const RGB& rgb)
 {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
@@ -344,7 +344,7 @@ RGB gamut_clip_project_to_L_cusp(RGB rgb)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_adaptive_L0_0_5(RGB rgb, float alpha = 0.05f)
+RGB gamut_clip_adaptive_L0_0_5(const RGB& rgb, float alpha = 0.05f)
 {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
@@ -368,7 +368,7 @@ RGB gamut_clip_adaptive_L0_0_5(RGB rgb, float alpha = 0.05f)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_adaptive_L0_L_cusp(RGB rgb, float alpha = 0.05f)
+RGB gamut_clip_adaptive_L0_L_cusp(const RGB& rgb, float alpha = 0.05f)
 {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
@@ -478,7 +478,7 @@ Cs get_Cs(float L, float a_, float b_)
 	return { C_0, C_mid, C_max };
 }
 
-Lab okhsv_to_oklab(HSV hsv)
+Lab okhsv_to_oklab(const HSV& hsv)
 {
   float h = hsv.h;
 	float s = hsv.s;
@@ -520,7 +520,7 @@ Lab okhsv_to_oklab(HSV hsv)
 	return { L, C * a_, C * b_ };
 }
 
-HSV oklab_to_okhsv(Lab lab)
+HSV oklab_to_okhsv(const Lab& lab)
 {
   float C = sqrtf(lab.a * lab.a + lab.b * lab.b);
 	float a_ = lab.a / C;
@@ -563,7 +563,7 @@ HSV oklab_to_okhsv(Lab lab)
 	return { h, s, v };
 }
 
-Lab oklch_to_oklab(LCH lch)
+Lab oklch_to_oklab(const LCH& lch)
 {
   return {
     lch.L,
@@ -572,7 +572,7 @@ Lab oklch_to_oklab(LCH lch)
   };
 }
 
-uint32_t linear_srgb_to_neopixel_code(RGB rgb) 
+uint32_t linear_srgb_to_neopixel_code(const RGB& rgb) 
 {
   return ((uint8_t)(255.0 * clamp(rgb.r,0.0,1.0)) << 16)
        | ((uint8_t)(255.0 * clamp(rgb.g,0.0,1.0)) << 8)
@@ -580,7 +580,7 @@ uint32_t linear_srgb_to_neopixel_code(RGB rgb)
 }
 
 // if color choice is #rrggbb
-uint32_t srgb_to_neopixel_code(RGB rgb)
+uint32_t srgb_to_neopixel_code(const RGB& rgb)
 {
   return linear_srgb_to_neopixel_code({
 		srgb_transfer_function_inv(rgb.r),
@@ -590,7 +590,7 @@ uint32_t srgb_to_neopixel_code(RGB rgb)
 }
 
 // if color choice is perceptual hue/sat/val
-uint32_t okhsv_to_neopixel_code(HSV hsv)
+uint32_t okhsv_to_neopixel_code(const HSV& hsv)
 {
 	return  linear_srgb_to_neopixel_code(
             oklab_to_linear_srgb(
@@ -602,7 +602,7 @@ uint32_t okhsv_to_neopixel_code(HSV hsv)
 }
 
 // if color choice is perceptual light / chroma / hue
-uint32_t oklch_to_neopixel_code(LCH lch)
+uint32_t oklch_to_neopixel_code(const LCH& lch)
 {
   return  linear_srgb_to_neopixel_code(
             oklab_to_linear_srgb(

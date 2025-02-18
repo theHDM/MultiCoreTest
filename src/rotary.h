@@ -13,7 +13,6 @@
 
 #include <stdint.h>
 #include <functional>
-
 #include <Wire.h>
 #include "pico/util/queue.h"
 #include "pico/time.h"
@@ -86,9 +85,8 @@ protected:
   bool _longPressRegistered;
   bool _debouncePassed;
 
-
   // however, GEM_Menu will set interval in milliseconds.
-  void calibrate(bool& setInvert, int& setLP, int& setDC) {
+  void calibrate(bool setInvert, int setLP, int setDC) {
     _invert = setInvert;
     _longPressThreshold = (setLP * 1000) - 1;
     _doubleClickThreshold = (setDC * 1000) - 1;
@@ -111,7 +109,7 @@ public:
   void stop()  { _active = false; }
   
   // wrapper to safely calibrate knob from core0
-  void recalibrate(bool& invert_yn, int& longPress_mS, int& doubleClick_mS) {
+  void recalibrate(bool invert_yn, int longPress_mS, int doubleClick_mS) {
     while (ownership == 1) {}
     ownership = 0;
     calibrate(invert_yn, longPress_mS, doubleClick_mS);

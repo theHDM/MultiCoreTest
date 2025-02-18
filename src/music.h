@@ -136,12 +136,12 @@ const float clarinetPhase[11] = {
 
 uint32_t frequency_to_interval(
   // determining the DDS step interval based on frequency
-  const double&   frequency, 
-  const uint32_t& interval_in_uS) {
+  double   frequency, 
+  uint32_t interval_in_uS) {
   return lround(ldexp(frequency * interval_in_uS / 1000000.d, 32));
 }
 
-uint8_t iso226(const double& f) {
+uint8_t iso226(double f) {
   // a very crude implementation of ISO 226 equal loudness curves
   //   Hz dB  Amplitude ~ sqrt(10^(dB/10))
   //  200 +0  255
@@ -159,9 +159,9 @@ uint8_t iso226(const double& f) {
 
 double frequency_after_pitch_bend(
   // to apply global pitch bend to synth channels
-  const double&   base_frequency, 
-  const int16_t&  global_pitch_bend, 
-  const uint8_t&  pitch_bend_range_in_semitones) {
+  double  base_frequency, 
+  int16_t global_pitch_bend, 
+  uint8_t pitch_bend_range_in_semitones) {
   return base_frequency 
        * exp2(ldexp(global_pitch_bend 
        * pitch_bend_range_in_semitones / 3.d, 

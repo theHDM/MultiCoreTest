@@ -156,12 +156,11 @@ enum {
 // a numerical value, which you can then express
 // as its associated boolean/int/float value at will
 const size_t bytes_per_setting = 8;
-using Byte_Array = std::array<uint8_t, bytes_per_setting>;
 union Setting_Value {
   bool b;
   int i;
   double d;
-  Byte_Array w;
+  std::array<uint8_t, bytes_per_setting> w;
 };
 using hexBoard_Setting_Array = std::array<Setting_Value, _settingSize>;
 

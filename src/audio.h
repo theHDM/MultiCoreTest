@@ -45,7 +45,7 @@ struct Synth_Voice {
   // define a series of setter functions for core0
   // which will block if core1 is trying to calculate
   // the next sample.
-  void update_wavetable(std::array<int8_t,256> tbl) {
+  void update_wavetable(const std::array<int8_t,256>& tbl) {
     while (ownership == 1) {}
     ownership = 0;
     for (size_t i = 0; i <  256; ++i) {

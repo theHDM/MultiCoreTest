@@ -17,7 +17,6 @@ hexBoard_Rotary_Object rotary(rotaryPinA, rotaryPinB, rotaryPinC);
 hexBoard_Key_Object    keys(muxPins, colPins, analogPins);
 
 bool on_callback_synth(struct repeating_timer *t) {
-  successes++;
   synth.poll();
   return true;
 }
@@ -74,6 +73,7 @@ hexBoard_Grid_Object   hexBoard(hexBoard_layout_v1_2);
 OLED_screensaver       oled_screensaver(default_contrast, screensaver_contrast);
 #include "src/menu.h"
 #include "src/GUI.h"
+#include "src/layout.h"
 
 void hardwired_switch_handler(int16_t ID) {
   switch (ID) {
@@ -101,7 +101,7 @@ void calibrate_rotary_from_settings(hexBoard_Setting_Array& refS) {
 void pre_cache_synth_waveform(hexBoard_Setting_Array& refS) {
   switch (refS[_synthWav].i) {
     case _synthWav_square:
-      hexBoard.cached_waveform  = linear_waveform(1.f, Linear_Wave::square, 0);
+      hexBoard.cached_waveform = linear_waveform(1.f, Linear_Wave::square, 0);
       break;
     case _synthWav_saw:
       hexBoard.cached_waveform = linear_waveform(1.f, Linear_Wave::saw, 0);
@@ -122,16 +122,17 @@ void pre_cache_synth_waveform(hexBoard_Setting_Array& refS) {
       break;
   } 
 }
-
 void apply_settings_to_objects(hexBoard_Setting_Array& refS) {
   set_audio_outs_from_settings(refS);
   calibrate_rotary_from_settings(refS);
   pre_cache_synth_waveform(refS); 
+  generate_layout(refS);
 }
 void menu_handler(int settingNumber) {
   switch (settingNumber) {
     case _run_routine_to_generate_layout:
-      // um, do that
+      generate_layout(settings);
+      menu.setMenuPageCurrent(pgHome);
       break;
     
     case _txposeS: case _txposeC:
@@ -182,7 +183,6 @@ void menu_handler(int settingNumber) {
   }
 }
 
-
 void interpret_key_msg(Key_Msg& msg) {
   Button* b = &(hexBoard.button_at_linear_index(msg.switch_number));
   b->update_levels(msg.timestamp, msg.level);
@@ -194,6 +194,8 @@ void interpret_key_msg(Key_Msg& msg) {
     switch (app_state) {
       case App_state::play_mode:
       case App_state::menu_nav: {
+        settings[_anchorX].i = b->coord.x;
+        settings[_anchorY].i = b->coord.y;
         if (queue_is_empty(&open_synth_channel_queue)) {
           debug.add("emptyyyy\n");
           return;
@@ -333,6 +335,11 @@ void process_menu_input(Rotary_Action& A) {
 
 struct repeating_timer polling_timer_LED;
 bool on_LED_frame_refresh(repeating_timer *t) {
+  for (auto& b : hexBoard.btn) {
+    if (!b.isBtn) continue;
+    strip.setPixelColor(b.pixel, b.LEDcodeBase);
+  }
+  strip.show();
   return true;
 }
 

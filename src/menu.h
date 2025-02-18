@@ -572,13 +572,6 @@ void onSelect_generate(GEMCallbackData callbackData) {
   menu.drawMenu();
 }
 
-void onComplete_generate() {
-  // make the layout
-  // success/failure screen
-  menu.setMenuPageCurrent(pgShowMsg);
-}
-
-
 void create_menu_items_for_user_settings() {
   #define _CREATE_MANUAL(A, T, L)    menuItem[A] = new GEMItem(L, settings[A].T,    onChg, A)
   #define _CREATE_SELECT(A, T, L, S) menuItem[A] = new GEMItem(L, settings[A].T, S, onChg, A)
@@ -691,7 +684,7 @@ void populate_menu_structure() {
       .addMenuItem(*menuItem[_anchorN])
       .addMenuItem(*menuItem[_anchorC])
       .addMenuItem(*menuItem[_txposeS])
-      .addMenuItem(*new GEMItem(">> Generate!!", onComplete_generate))
+      .addMenuItem(*new GEMItem(">> Generate!!", onChg, _run_routine_to_generate_layout))
       ;
   pgPlayback
     .addMenuItem(*new GEMItem("MIDI...", pgMIDI))

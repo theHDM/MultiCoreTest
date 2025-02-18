@@ -1,12 +1,6 @@
 #pragma once
 /* 
- *  This is the background code for direct digital synthesis
- *  of synthesizer sounds for the HexBoard.
- *  This code is run on core1 in the background, calculates
- *  one audio sample every polling period and sends to
- *  designated pins via PWM. When core1 is inactive, core0
- *  may update the object with music messages such as note-on,
- *  waveform change, mod wheel, volume, pressure, etc.
+ *  Basically, this is all the "music + math" logic.
  */
 #include <stdint.h>
 #include <cmath>
@@ -123,6 +117,7 @@ wave_tbl additive_synthesis(size_t harmonicLimit, const float* amt, const float*
   return result;
 }
 
+// harmonic wave presets
 const float sineAmt[1]   = {1.f};
 const float sinePhase[1] = {0.f};
 const float stringsAmt[10]   = {
@@ -140,6 +135,7 @@ const float clarinetPhase[11] = {
 
 
 uint32_t frequency_to_interval(
+  // determining the DDS step interval based on frequency
   const double&   frequency, 
   const uint32_t& interval_in_uS) {
   return lround(ldexp(frequency * interval_in_uS / 1000000.d, 32));
@@ -162,6 +158,7 @@ uint8_t iso226(const double& f) {
 }
 
 double frequency_after_pitch_bend(
+  // to apply global pitch bend to synth channels
   const double&   base_frequency, 
   const int16_t&  global_pitch_bend, 
   const uint8_t&  pitch_bend_range_in_semitones) {
@@ -169,4 +166,14 @@ double frequency_after_pitch_bend(
        * exp2(ldexp(global_pitch_bend 
        * pitch_bend_range_in_semitones / 3.d, 
         -15));
+}
+
+double freqToMIDI(double Hz) {             // formula to convert from Hz to MIDI note
+  return 69.0 + 12.0 * log2(Hz / 440.0);
+}
+double MIDItoFreq(double midi) {           // formula to convert from MIDI note to Hz
+  return 440.0 * exp2((midi - 69.0) / 12.0);
+}
+double intervalToCents(double interval) {
+  return 1200.0 * log2(interval);
 }

@@ -63,3 +63,21 @@ Hex unitHex[] = {
   // E       NE      NW      W       SW      SE
   { 2, 0},{ 1,-1},{-1,-1},{-2, 0},{-1, 1},{ 1, 1}
 };
+
+struct axial_Hex {
+  int a;
+  int b;
+  axial_Hex(const Hex& h, const Hex& axisA, const Hex& axisB) {
+    if ((axisA == unitHex[dir_e]) || (axisA == unitHex[dir_w])) {
+      b = h.y / axisB.y;
+      a = (h.x - b * axisB.x) / axisA.x;
+    } else if ((axisB == unitHex[dir_e]) || (axisB == unitHex[dir_w])) {
+      a = h.y / axisA.y;
+      b = (h.x - a * axisA.x) / axisB.x;
+    } else {
+      a = h.x / axisA.x;
+      b = (h.y - a * axisA.y) / 2 / axisB.y;
+      a += (h.y - a * axisA.y) / 2 / axisA.y;
+    }
+  }  
+};

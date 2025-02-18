@@ -39,9 +39,8 @@ struct Button {
 /*!!*/  int8_t   scaleEquave = 0;
 /*!!*/  uint8_t  scaleDegree = 0;     // order in scale relative to equave
 /*!!*/  bool     inScale = false; // for scale-lock purposes
-/*!!*/  double   frequency = 0.0; // equivalent pitch in Hz
-/*!!*/  uint8_t  midiNote = 0;    // nearest MIDI pitch, 0 to 128
-/*!!*/  int16_t  midiBend = 0;    // pitch bend for MPE purposes
+/*!!*/  double   midiPitch = 0.0; // pitch, 69 = A440, every 1.0 is 100.0 cents
+/*!!*/  double   frequency = 0.0; // equivalent of pitch in Hz
 
 /*!!*/  bool     isCmd  = false;  // is it a command button
 /*!!*/  uint8_t  cmd = 0;  // control parameter corresponding to this hex
@@ -54,6 +53,8 @@ struct Button {
   bool     just_pressed   = false;
   bool     just_released  = false;
   uint8_t  midiChPlaying  = 0;          // what midi channel is there currrently a note-on
+  uint8_t  midiNote = 0;    // nearest MIDI pitch, 0 to 128
+  int16_t  midiBend = 0;    // pitch bend for MPE purposes
   uint8_t  synthChPlaying = 0;         // what synth channel is there currrently a note-on
 
   void update_levels(uint32_t& timestamp, uint8_t& new_level) {
@@ -128,12 +129,13 @@ struct hexBoard_Grid_Object {
           b->atCol  = layout[i][_layout_table_column_pin];
 
           /* placeholder to put note values for testing */
-          b->LEDcodeBase     = 0x11111100; // for now
-          b->LEDcodeAnim     = 0x11111100; // calculate it once and store value, to make LED playback snappier 
-          b->LEDcodePlay     = 0x11111100; // calculate it once and store value, to make LED playback snappier
-          b->LEDcodeRest     = 0x11111100; // calculate it once and store value, to make LED playback snappier
+          b->isNote          = true;
+          b->LEDcodeBase     = 0x00000000; // for now
+          b->LEDcodeAnim     = 0x00000000; // calculate it once and store value, to make LED playback snappier 
+          b->LEDcodePlay     = 0x00000000; // calculate it once and store value, to make LED playback snappier
+          b->LEDcodeRest     = 0x00000000; // calculate it once and store value, to make LED playback snappier
           b->LEDcodeOff      = 0; // calculate it once and store value, to make LED playback snappier
-          b->LEDcodeDim      = 0x11111100; // calculate it once and store value, to make LED playback snappier
+          b->LEDcodeDim      = 0x00000000; // calculate it once and store value, to make LED playback snappier
           b->frequency       = 10.0 + (b->pixel * 10.0); // equivalent pitch in Hz
           b->midiCh          = 1;      // what channel assigned (if not MPE mode)   [1..16]
           b->midiTuningTable = 255; // assigned MIDI note (if MTS mode) [0..127]
@@ -141,6 +143,7 @@ struct hexBoard_Grid_Object {
           b->scaleDegree     = 0;     // order in scale relative to equave
           b->inScale         = true; // for scale-lock purposes
           b->cmd             = 0;  // control parameter corresponding to this hex
+          b->midiPitch       = 69.0;
           b->midiNote        = 69;
           b->midiBend        = 0;
 
@@ -160,6 +163,52 @@ struct hexBoard_Grid_Object {
           break;
       }
     }
+    btn[0].LEDcodeBase = 0x010000;
+    btn[20].LEDcodeBase = 0x010100;
+    btn[40].LEDcodeBase = 0x000100;
+    btn[60].LEDcodeBase = 0x000101;
+    btn[80].LEDcodeBase = 0x000001;
+    btn[100].LEDcodeBase = 0x010001;
+    btn[120].LEDcodeBase = 0x010101;
+    btn[1].LEDcodeBase = 0x020000;
+    btn[2].LEDcodeBase = 0x020100;
+    btn[3].LEDcodeBase = 0x020200;
+    btn[4].LEDcodeBase = 0x010200;
+    btn[5].LEDcodeBase = 0x000200;
+    btn[11].LEDcodeBase = 0x000200;
+    btn[12].LEDcodeBase = 0x000201;
+    btn[13].LEDcodeBase = 0x000202;
+    btn[14].LEDcodeBase = 0x000102;
+    btn[15].LEDcodeBase = 0x000002;
+    btn[21].LEDcodeBase = 0x000002;
+    btn[22].LEDcodeBase = 0x010002;
+    btn[23].LEDcodeBase = 0x020002;
+    btn[24].LEDcodeBase = 0x020001;
+    btn[25].LEDcodeBase = 0x020000;
+btn[31].LEDcodeBase = 0x030000;
+btn[32].LEDcodeBase = 0x030100;
+btn[33].LEDcodeBase = 0x030200;
+btn[34].LEDcodeBase = 0x030300;
+btn[35].LEDcodeBase = 0x020300;
+btn[36].LEDcodeBase = 0x010300;
+btn[37].LEDcodeBase = 0x000300;
+btn[41].LEDcodeBase = 0x000300;
+btn[42].LEDcodeBase = 0x000301;
+btn[43].LEDcodeBase = 0x000302;
+btn[44].LEDcodeBase = 0x000303;
+btn[45].LEDcodeBase = 0x000203;
+btn[46].LEDcodeBase = 0x000103;
+btn[47].LEDcodeBase = 0x000003;
+btn[51].LEDcodeBase = 0x000003;
+btn[52].LEDcodeBase = 0x010003;
+btn[53].LEDcodeBase = 0x020003;
+btn[54].LEDcodeBase = 0x030003;
+btn[55].LEDcodeBase = 0x030002;
+btn[56].LEDcodeBase = 0x030001;
+btn[57].LEDcodeBase = 0x030000;
+
+
+
   }
 
   Button& button_at_coord(Hex& coord) {

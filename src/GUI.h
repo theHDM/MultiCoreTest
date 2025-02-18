@@ -1,5 +1,5 @@
 #pragma once
-
+#include <string>
 // high-level code
 // presumes this is included at the end of other declarations
 
@@ -27,10 +27,19 @@ void draw_GUI(int context) {
     }
   }
   if (context & _show_pixel_ID) {
-    u8g2.drawStr(_LEFT_MARGIN, 8, "Press anchor hex >>");
+    Hex selHex;
+    selHex.x = settings[_anchorX].i;
+    selHex.y = settings[_anchorY].i;
+    if (hexBoard.in_bounds(selHex)) {
+      u8g2.drawStr(_LEFT_MARGIN, 8, "Anchor hex: ");
+      u8g2.drawStr(_LEFT_MARGIN + 84, 8, std::to_string(hexBoard.coord_to_pixel[selHex]).c_str());
+    } else {
+      u8g2.drawStr(_LEFT_MARGIN, 8, "Press anchor hex >>");
+    }
   }
   if (context & _show_custom_msg) {
     u8g2.drawStr(_LEFT_MARGIN, 18, "Success or fail");
     u8g2.drawStr(_LEFT_MARGIN, 28, "message here.");
   }
+
 }

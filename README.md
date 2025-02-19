@@ -1,3 +1,19 @@
+MOS step ratios
+
+```
+1:1 Equal
+5:4 
+4:3 
+3:2  Soft
+5:3 
+2:1 Basic
+5:2 
+3:1  Hard
+4:1 
+5:1 
+Collapsed
+```
+
 scale: 
 period and degrees in cents
 
@@ -31,7 +47,7 @@ tier 1, but what if its enharmoni
 
 ?
 count by 4s. 101 means from flat 11p
-# F C G D   A
+ F C G D   A
 size of fifth:
 if edo is a weird one
 

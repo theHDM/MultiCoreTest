@@ -13,6 +13,9 @@ MOS step ratios
 5:1 
 Collapsed
 ```
+Modes 0 thru S-1 length of scale
+except if Lg and Sm are not coprime
+then divide by K.
 
 scale: 
 period and degrees in cents

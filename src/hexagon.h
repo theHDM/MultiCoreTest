@@ -2,12 +2,6 @@
 
 // a hexboard obviously needs to have a class of hexagon coordinates.
 // https://www.redblobgames.com/grids/hexagons/ for more details.
-//
-//                     | -y axis
-//              [-1,-1] [ 1,-1]
-//  -x axis [-2, 0] [ 0, 0] [ 2, 0]  +x axis
-//              [-1, 1] [ 1, 1]
-//                     | +y axis
 
 struct Hex { 
 	int x;      
@@ -49,6 +43,13 @@ struct Hex {
 int dot_product(const Hex& A, const Hex& B) {
     return (A.x * B.x) + (A.y * B.y);
 }
+
+//
+//                     | -y axis
+//              [-1,-1] [ 1,-1]
+//  -x axis [-2, 0] [ 0, 0] [ 2, 0]  +x axis
+//              [-1, 1] [ 1, 1]
+//                     | +y axis
 // keep this as a non-class enum because
 // we need to be able to cycle directions
 enum {

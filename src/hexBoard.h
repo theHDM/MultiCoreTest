@@ -6,49 +6,58 @@
 #include "hexagon.h"
 #include "music.h"
 
-
-/* serialize members with a !! */
 struct Button {
-/*!!*/  bool     isUsed = false;  // is it a button or a hardwired circuit
-/*!!*/  int8_t   atMux  = -1;
-/*!!*/  int8_t   atCol  = -1;
+  // basic identification
+  bool      isUsed = false;  // is it a button or a hardwired circuit
+  int8_t    atMux  = -1;
+  int8_t    atCol  = -1;
+  bool      isBtn  = false;  // is it a button not a hardwired circuit
+  Hex       coord  = {0,0};  // physical location
+  int16_t   pixel  = -1;     // the button's index in the grid, which is equal to its associated pixel number if it has one
+  bool      isNote = false;  // is it a music note object
+  bool      isCmd  = false;  // is it a command button
 
-/*!!*/  bool     isBtn  = false;  // is it a button not a hardwired circuit
-/*!!*/  Hex      coord  = {0,0};  // physical location
-/*!!*/  int16_t  pixel  = -1;     // the button's index in the grid, which is equal to its associated pixel number if it has one
+  // layout and scale variables
+  int8_t    A_steps = 0;      // cached number of steps along A axis from anchor
+  int8_t    B_steps = 0;      // cached number of steps along B axis from anchor
+  bool      inScale = false;  // for scale-lock purposes
+  int8_t    scaleEquave = 0;  // not used for JI lattice
+  int8_t    scaleDegree = 0;  // for 1-dimension
+  int8_t    smallDegree = 0;  // # of small steps (microtonal / MOS)
+  int8_t    largeDegree = 0;  // # of large steps (microtonal / MOS)
 
+  // MIDI and pitch assignment
+  uint8_t   midiCh = 0;      // what channel assigned (if not MPE mode)   [1..16]
+  uint8_t   midiTuningTable = 255; // assigned MIDI note (if MTS mode) [0..127]
+  double    midiPitch = 0.0; // pitch, 69 = A440, every 1.0 is 100.0 cents
+  double    frequency = 0.0; // equivalent of pitch in Hz
+  uint8_t   cmd = 0;  // control parameter corresponding to this hex
 
-/*!!*/  bool     isNote = false;  // is it a music note object
-/*!!*/  uint8_t  midiCh = 0;      // what channel assigned (if not MPE mode)   [1..16]
-/*!!*/  uint8_t  midiTuningTable = 255; // assigned MIDI note (if MTS mode) [0..127]
-/*!!*/  int8_t   scaleEquave = 0;
-/*!!*/  uint8_t  scaleDegree = 0;     // order in scale relative to equave
-/*!!*/  bool     inScale = false; // for scale-lock purposes
-/*!!*/  double   midiPitch = 0.0; // pitch, 69 = A440, every 1.0 is 100.0 cents
-/*!!*/  double   frequency = 0.0; // equivalent of pitch in Hz
-/*!!*/  int8_t   paletteNum = 0;  // used for tiered key coloring
+  // palette and cached LED codes
+  int8_t    paletteNum = 0;  // used for tiered key coloring (all except JI)
+  uint32_t  LEDcodeBase = 0; // calculate it once and store value, to make LED playback snappier 
+  uint32_t  LEDcodeAnim = 0; // calculate it once and store value, to make LED playback snappier 
+  uint32_t  LEDcodePlay = 0; // calculate it once and store value, to make LED playback snappier
+  uint32_t  LEDcodeRest = 0; // calculate it once and store value, to make LED playback snappier
+  uint32_t  LEDcodeOff  = 0; // calculate it once and store value, to make LED playback snappier
+  uint32_t  LEDcodeDim  = 0; // calculate it once and store value, to make LED playback snappier
 
-/*!!*/  bool     isCmd  = false;  // is it a command button
-/*!!*/  uint8_t  cmd = 0;  // control parameter corresponding to this hex
+  // key press data
+  uint32_t  timeLastUpdate = 0; // store time that key level was last updated
+  uint32_t  timePressBegan = 0; // store time that full press occurred
+  uint32_t  timeHeldSince  = 0;
+  uint8_t   pressure       = 0; // press level currently
+  uint8_t   velocity       = 0; // proxy for velocity
+  bool      just_pressed   = false;
+  bool      just_released  = false;
 
-/*!!*/  uint32_t LEDcodeBase = 0; // for now
-/*!!*/  uint32_t LEDcodeAnim = 0; // calculate it once and store value, to make LED playback snappier 
-/*!!*/  uint32_t LEDcodePlay = 0; // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeRest = 0; // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeOff  = 0; // calculate it once and store value, to make LED playback snappier
-/*!!*/  uint32_t LEDcodeDim  = 0; // calculate it once and store value, to make LED playback snappier
-  uint32_t timeLastUpdate = 0; // store time that key level was last updated
-  uint32_t timePressBegan = 0; // store time that full press occurred
-  uint32_t timeHeldSince  = 0;
-  uint8_t  pressure       = 0; // press level currently
-  uint8_t  velocity       = 0; // proxy for velocity
-  bool     just_pressed   = false;
-  bool     just_released  = false;
-  uint8_t  midiChPlaying  = 0;          // what midi channel is there currrently a note-on
-  uint8_t  midiNote = 0;    // nearest MIDI pitch, 0 to 128
-  int16_t  midiBend = 0;    // pitch bend for MPE purposes
-  uint8_t  synthChPlaying = 0;         // what synth channel is there currrently a note-on
+  // music playback status
+  uint8_t   midiChPlaying  = 0;          // what midi channel is there currrently a note-on
+  uint8_t   midiNote = 0;    // nearest MIDI pitch, 0 to 128
+  int16_t   midiBend = 0;    // pitch bend for MPE purposes
+  uint8_t   synthChPlaying = 0;         // what synth channel is there currrently a note-on
 
+  // member functions
   void update_levels(uint32_t& timestamp, uint8_t& new_level) {
     if (pressure == new_level) return;
     timeLastUpdate = timestamp;
@@ -81,6 +90,8 @@ struct Button {
   }
 };
 
+
+
 void hardwired_switch_handler(int16_t ID);
 
 struct hexBoard_Grid_Object {
@@ -88,7 +99,6 @@ struct hexBoard_Grid_Object {
   std::map<Hex,      int16_t>    coord_to_pixel;
   std::map<uint8_t,  int16_t>    index_to_pixel;
   wave_tbl                       cached_waveform;
-  
 
   hexBoard_Grid_Object(const int16_t layout[keys_count][_layout_table_size]) {
     // first count how many rows represent usable inputs,

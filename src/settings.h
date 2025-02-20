@@ -40,7 +40,10 @@ enum {
   _smStepA,  //
   _lgStepB,  //
   _smStepB,  //
-  _lgToSm,   //
+  _lgToSmND, // rational number?
+  _lgToSmR,  //
+  _lgToSmN,  //
+  _lgToSmD,  //
   _modeLgSm, //
   _JInumA,   //
   _JIdenA,   //
@@ -196,7 +199,10 @@ void load_factory_defaults_to(hexBoard_Setting_Array& refS, int version = 0) {
   refS[_smStepA].i  = 0;      // no semitones
   refS[_lgStepB].i  = 3;      // three whole tones
   refS[_smStepB].i  = 1;      // and one semitone
-  refS[_lgToSm].d   = 2.0;    // whole tone is 2x the semitone
+  refS[_lgToSmND].b = true;   // 
+  refS[_lgToSmR].d  = 2.0;    // whole tone is 2x the semitone
+  refS[_lgToSmN].i  = 2;      // whole tone is 2x the semitone
+  refS[_lgToSmD].i  = 1;      // whole tone is 2x the semitone
   refS[_modeLgSm].i = 1;      // mode 1 = major, mode 0 = lydian
   refS[_JInumA].i   = 8;      // 9/8 = JI major second
   refS[_JIdenA].i   = 9;      // 9/8 = JI major second

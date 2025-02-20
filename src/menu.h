@@ -5,7 +5,7 @@
 GEM_u8g2 menu(u8g2);
 
 struct GEMItemPublic : public GEMItem {
-  GEMItemPublic(const GEMItem &g) : GEMItem(g) {}
+  GEMItemPublic(const GEMItem& g) : GEMItem(g) {}
   byte getLinkedType() { return linkedType; }
 };
 struct GEMPagePublic : public GEMPage {
@@ -25,7 +25,7 @@ struct GEMPagePublic : public GEMPage {
   : GEMPage(title_), GUI_context(GUI_context_) {
     initialize_appearance(titleRows_, menuItemsPerScreen_, valueMargin_);
   }
-  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_, const GEMPage& parentMenuPage_)
+  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_, GEMPage& parentMenuPage_)
   : GEMPage(title_, parentMenuPage_), GUI_context(GUI_context_) {
     initialize_appearance(titleRows_, menuItemsPerScreen_, valueMargin_);
   }
@@ -490,7 +490,8 @@ void showHide_tuning() {
   menuItem[_equaveD]->hide(!settings[_equaveJI].b); 
   menuItem[_lgSteps]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
   menuItem[_smSteps]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
-  menuItem[_lgToSm]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
+  menuItem[_lgToSmR]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
+  // others tbd
   menuItem[_modeLgSm]->hide(settings[_tuneSys].i != _tuneSys_lg_sm);
   menuItem[_eqDivs]->hide(settings[_tuneSys].i != _tuneSys_equal);
 }
@@ -600,7 +601,9 @@ void create_menu_items_for_user_settings() {
   _CREATE_SELECT(_smStepA,  i, "Axis A, Sm:",  spin_n127_127);
   _CREATE_SELECT(_lgStepB,  i, "Axis B, Lg:",  spin_n127_127);  
   _CREATE_SELECT(_smStepB,  i, "Axis B, Sm:",  spin_n127_127);
-  _CREATE_MANUAL(_lgToSm,   d, "Ratio Lg/Sm:");
+  _CREATE_MANUAL(_lgToSmR,  d, "Ratio Lg/Sm:");
+  // lgToSmN.i from a special dropdown
+  // lgToSmD.i from a special dropdown
   _CREATE_SELECT(_modeLgSm, i, "Mode number:", spin_0_127);
   _CREATE_SELECT(_JInumA,   i, "Numerator:",   spin_1_255);
   _CREATE_SELECT(_JIdenA,   i, "Denominator:", spin_1_255);
@@ -667,7 +670,7 @@ void populate_menu_structure() {
       .addMenuItem(*menuItem[_equaveD] ) .addMenuItem(spacer_1) 
       .addMenuItem(*menuItem[_lgSteps] ) .addMenuItem(*menuItem[_eqDivs]  )
       .addMenuItem(*menuItem[_smSteps] )
-      .addMenuItem(*menuItem[_lgToSm]  ) 
+      .addMenuItem(*menuItem[_lgToSmR] ) 
       .addMenuItem(*menuItem[_modeLgSm])
       .addMenuItem(*new GEMItem(">> Continue", pgGenerate))
       ;

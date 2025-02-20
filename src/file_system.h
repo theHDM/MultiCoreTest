@@ -23,7 +23,7 @@ bool load_settings(hexBoard_Setting_Array& refS, const char* FN) {
   }
   int p = 0;
   while (f.available()) {
-    Byte_Array b;
+    std::array<uint8_t, bytes_per_setting> b;
     for (int i = 0; i < bytes_per_setting; ++i) {
       b[i] = f.read();
     }

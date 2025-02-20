@@ -50,7 +50,7 @@ public:
   : mux(arrM), col(arrC), analog(arrA), m_ctr(0), m_val(0)
   , active(false), send_pressure(false) {
     for (size_t i = 0; i < mux_pins_count; ++i) {
-      pinMode(, OUTPUT);
+      pinMode(*(mux + i), OUTPUT);
       digitalWrite(*(mux + i), 0);
     }
     for (size_t i = 0; i < col_pins_count; ++i) {

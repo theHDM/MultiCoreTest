@@ -14,15 +14,19 @@ void update_if_closer_to_zero(T1& LHS, const T2& RHS) {
   if (std::abs(RHS) < std::abs(LHS)) {LHS = RHS;}
 }
 
+// cache value of log(3/2) / log(2)
+const double perfectFifth = 0.5849625007211562;
+
 void generate_and_apply_EDO_layout(double octave, int EDO, int A_span, int B_span) {
-  int spanFifth = (EDO == 13 ? 7 : (EDO == 18 ? 10 : 
-                  round(EDO * log2f(1.5f))));
+  int spanFifth = round(EDO * perfectFifth);
+  // for 13EDO and 18EDO it is preferable to round down
+  // to the "flatter" fifth and not up to the "sharper" fifth
+  if ((EDO == 13) || (EDO == 18)) { --spanFifth; }
   int spanFourth = EDO - spanFifth;
   int spanSharp  = 7 * spanFifth - 4 * EDO;
   int spanMajor2 = 2 * spanFifth - EDO;
   int spanMinor2 = spanMajor2 - spanSharp;
   int spanMinor3 = spanFourth - spanMajor2;
-  int spanMinor7 = spanFifth - spanMinor3;
   for (auto& n : hexBoard.btn) {
     if (!n.isBtn) continue;
     if (!n.isNote) continue; // for now assuming cmd btns are unchanged
@@ -41,31 +45,54 @@ void generate_and_apply_EDO_layout(double octave, int EDO, int A_span, int B_spa
     if (EDO < 10) { // algorithm doesn't really work below 10 EDO
       n.paletteNum = n.scaleDegree;
     } else {
-      int stepsForPalette = n.scaleDegree;
+      // the white keys are tier 0 (C D E F G A B)
+      // the black keys are tier 1 (C#, Db, etc.)
+      // in larger EDOs you get other tiers like:
+      // tier -1: E# B# Fb Cb if they're separate
+      // tier 2/-2 or larger for other microtonal steps
+      // the algorithm works by knowing how to spell
+      // D and E, then treating all C F G & A's like D
+      // and treating B like E. we are assuming the
+      // "key" is "C", so that C = zero steps.
       
-           if (  n.scaleDegree >= spanMinor7) { stepsForPalette -= spanMinor7; }
-      else if (  n.scaleDegree >= spanFifth)  { stepsForPalette -= spanFifth;  }
-      else if (  n.scaleDegree >= spanFourth) { stepsForPalette -= spanFourth; }
-      else if (  n.scaleDegree >= spanMinor3) { stepsForPalette -= spanMinor3; }
-
-           if (stepsForPalette == 0)                      { n.paletteNum =  0; }
-      else if (stepsForPalette == spanMajor2)             { n.paletteNum =  0; }
-      else if (stepsForPalette == spanSharp)              { n.paletteNum =  1; }
-      else if (stepsForPalette == spanMinor2)             { n.paletteNum =  1; }
-      else if (stepsForPalette == spanMajor2 + spanSharp) { n.paletteNum = -1; }
-      else if (stepsForPalette == spanMinor3 - spanSharp) { n.paletteNum = -1; }
-      else { // for larger EDOs you will have microtonal tiers
+      // G, A, and B are spelled the same as C, D, and E.
+      // so take the scale degree modulo the 5th.
+      int stepsForPalette = n.scaleDegree % spanFifth;
+            // C is spelled like D, but D is now going to be zero.
+            if (stepsForPalette >= spanMajor2) { stepsForPalette -= spanMajor2; }
+            // G is spelled like F.
+            if (stepsForPalette >= spanFourth ) { stepsForPalette -= spanMajor2; }
+            // F is spelled like D.
+            if (stepsForPalette >= spanMinor3 ) { stepsForPalette -= spanMinor3; }
+            // C, D, F, G, and A are white keys.
+            if (stepsForPalette == 0)                       { n.paletteNum =  0; }
+            // E and B are white keys.
+      else  if (stepsForPalette == spanMajor2)              { n.paletteNum =  0; }
+            // C#, D#, F#, G#, and A# are black keys.
+      else  if (stepsForPalette == spanSharp)               { n.paletteNum =  1; }
+            // Db, Eb, Gb, Ab, and Bb are black keys.
+      else  if (stepsForPalette == spanMinor2)              { n.paletteNum =  1; }
+            // E# and B# get a different color if needed.
+      else  if (stepsForPalette == spanMajor2 + spanSharp)  { n.paletteNum = -1; }
+            // Fb and Cb get a different color if needed.
+      else  if (stepsForPalette == spanMinor3 - spanSharp)  { n.paletteNum = -1; }
+      else {
+        // if the note isn't one of those, then find how many microtonal steps
+        // away it is from a white or black key (not from E#/Fb).
         n.paletteNum = stepsForPalette;
         update_if_closer_to_zero(n.paletteNum, stepsForPalette - spanMinor3);
         update_if_closer_to_zero(n.paletteNum, stepsForPalette - spanMajor2);
         update_if_closer_to_zero(n.paletteNum, stepsForPalette - spanMinor2);
         update_if_closer_to_zero(n.paletteNum, stepsForPalette - spanSharp);
+        // then increase by one so that you start counting 
+        // at tier 2, 3, ... if sharp, or -2, -3, ... if flat.
+        // e.g. D^ is one microtonal step sharp of D, tier +2.
+        //      Dv is one microtonal step flat of D, tier -2.
+        //      Bb^^ is two microtonal steps sharp of Bb, tier 3.
         n.paletteNum += (n.paletteNum > 0 ? 1 : -1);
       }
     }
-    // anything else?
   }
-  // that should be it for all the keys.
 }
 
 
@@ -73,6 +100,7 @@ void generate_and_apply_EDO_layout(double octave, int EDO, int A_span, int B_spa
 // outputs a vector of booleans
 // large step = TRUE/1   small step = FALSE/0
 #include <vector>
+#include <map>
 
 uint gcd(const uint& _a, const uint& _b) {
   for (uint _f = _a - 1; _f > 1; --_f) {
@@ -83,172 +111,210 @@ uint gcd(const uint& _a, const uint& _b) {
   return 1;
 }
 
-std::vector<bool> generate_MOS_scale(uint8_t L, uint8_t S) {
-  std::vector<bool> result;
-  if ((L == 1) || (S == 1)) {
-    for (uint8_t i = 0; i < L; ++i) {
-      result.emplace_back(true);
-    }
-    for (uint8_t i = 0; i < S; ++i) {
-      result.emplace_back(false);
-    }
-    return result;
-  } else {
-    int K = gcd(L,S);
-    if (K > 1) {
-      result = generate_MOS_scale(L/K, S/K);
-      std::vector<bool> repeatKtimes;
-      for (uint8_t i = 0; i < K; ++i) {
-        for (uint8_t j = 0; j < result.size(); ++j) {
-          repeatKtimes.emplace_back(result[j]);
-        }
+struct MOS_Scale {
+  std::vector<bool> steps;
+  // inMode[Mode #][Lg steps][Sm steps]
+  std::vector<std::vector<std::vector<bool>>> inMode;
+  std::vector<std::vector<bool>> inMode_EDO_equiv;
+  uint Lg;
+  uint Sm;
+  uint K; // GCD
+  uint G; // bright generator
+  uint modeCt;
+  bool rational;
+  uint underlyingEDO;
+
+  float ratio_f;
+  uint ratio_num_s;
+  uint ratio_den_L;
+
+  void determine_G_and_K() {
+    K = gcd(Lg,Sm);
+    G = 0;
+    for (uint8_t m = 1; m < (Lg + Sm); ++m) {
+      if ((Sm * m) % (Lg + Sm) == 1) {
+        G = m;
+        break;
       }
-      return repeatKtimes;
+    }
+    modeCt = (Lg + Sm) / K;
+  }
+
+  std::vector<bool> recursively_generate_MOS_scale(uint8_t L, uint8_t S) {
+    std::vector<bool> result;
+    if ((L == 1) || (S == 1)) {
+      for (uint8_t i = 0; i < L; ++i) {
+        result.emplace_back(true);
+      }
+      for (uint8_t i = 0; i < S; ++i) {
+        result.emplace_back(false);
+      }
+      return result;
     } else {
-      uint8_t Mn = (L < S ? L : S);
-      uint8_t Mx = (L > S ? L : S);
-      uint8_t z = Mx % Mn;
-      uint8_t w = Mn - z;
-      uint8_t v = Mx / Mn; // floor, integer division
-      std::vector<bool> preScale = generate_MOS_scale(z, w);
-      if (L < S) {
-        std::reverse(preScale.begin(), preScale.end());
-        for (uint8_t i = 0; i < preScale.size(); ++i) {
-          result.emplace_back(true);
-          for (uint8_t j = 0; j < v + preScale[i]; ++j) {
+      int K = gcd(L,S);
+      if (K > 1) {
+        result = recursively_generate_MOS_scale(L/K, S/K);
+        std::vector<bool> repeatKtimes;
+        for (uint8_t i = 0; i < K; ++i) {
+          for (uint8_t j = 0; j < result.size(); ++j) {
+            repeatKtimes.emplace_back(result[j]);
+          }
+        }
+        return repeatKtimes;
+      } else {
+        uint8_t Mn = (L < S ? L : S);
+        uint8_t Mx = (L > S ? L : S);
+        uint8_t z = Mx % Mn;
+        uint8_t w = Mn - z;
+        uint8_t v = Mx / Mn; // floor, integer division
+        std::vector<bool> preScale = recursively_generate_MOS_scale(z, w);
+        if (L < S) {
+          std::reverse(preScale.begin(), preScale.end());
+          for (uint8_t i = 0; i < preScale.size(); ++i) {
+            result.emplace_back(true);
+            for (uint8_t j = 0; j < v + preScale[i]; ++j) {
+              result.emplace_back(false);
+            }
+          }
+        } else {
+          for (uint8_t i = 0; i < preScale.size(); ++i) {
+            for (uint8_t j = 0; j < v + preScale[i]; ++j) {
+              result.emplace_back(true);
+            }
             result.emplace_back(false);
           }
         }
-      } else {
-        for (uint8_t i = 0; i < preScale.size(); ++i) {
-          for (uint8_t j = 0; j < v + preScale[i]; ++j) {
-            result.emplace_back(true);
-          }
-          result.emplace_back(false);
+      }
+    }
+    return result;
+  }
+
+  MOS_Scale(int argL, int argS) : Lg(argL), Sm(argS) {
+    determine_G_and_K();
+    steps = recursively_generate_MOS_scale(Lg,Sm);
+  }
+
+  void set_L_S_ratio(float r) {
+    rational = false;
+    ratio_f = r;
+    underlyingEDO = 0;
+  }
+
+  void set_L_S_ratio(uint n_s, uint d_l) {
+    rational = true;
+    ratio_num_s = n_s;
+    ratio_den_L = d_l;
+    ratio_f = (float)n_s / (float)d_l;
+    underlyingEDO = Sm * d_l + Lg * n_s;
+    inMode_EDO_equiv.resize(modeCt, 
+      std::vector<bool>(underlyingEDO, false));
+  }
+
+  std::vector<bool> get_mode(int mode) {
+    std::vector<bool> result;
+    for (uint8_t i = 0; i < (Lg + Sm); ++i) {
+      result.emplace_back(steps[(i + (G * mode)) % (Lg + Sm)]);
+    }
+    return result;
+  }  
+
+  void determine_key_colors() {
+    // initialize vector
+    inMode.resize(modeCt,
+      std::vector<std::vector<bool>>(Lg + 1,
+        std::vector<bool>(Sm + 1, false)
+    ));
+    int iL; // iterate # lg steps
+    int iS; // iterate # sm steps
+    for (uint8_t m = 0; m < modeCt; ++m) {
+      // traverse each mode of this scale
+      std::vector<bool> thisMode = get_mode(m);
+      iL = 0;
+      iS = 0;
+      for (uint8_t i = 0; i < Lg + Sm; ++i) {
+        // traverse each step in this mode
+        // and mark it TRUE
+        inMode[m][iL][iS] = true;
+        if (rational) {
+          inMode_EDO_equiv[m][iL * ratio_num_s + iS * ratio_den_L] = true;
         }
+        iL +=  thisMode[i];
+        iS += !thisMode[i];
       }
     }
   }
-  return result;
-}
 
-std::vector<bool> generate_mode(const std::vector<bool>& baseScale, int mode) {
-  uint8_t T = baseScale.size();
-  // determine # of small steps directly from scale
-  uint8_t S = T;
-  for (const auto& d : baseScale) {
-    S -= d;
-  }
-  // calculate size of bright generator
-  uint8_t G = 0;
-  for (uint8_t m = 1; m < T; ++m) {
-    if ((S * m) % T == 1) {
-      G = m;
-      break;
-    }
-  }
-  // left shift the scale by generator * mode#
-  std::vector<bool> result;
-  for (uint8_t i = 0; i < T; ++i) {
-    result.emplace_back(baseScale[(i + (G * mode)) % T]);
-  }
-  return result;
-}
+};
 
-void mode_shift(std::vector<bool>& RHS) {
-  RHS = generate_mode(RHS, 1);
-}
 
-#include <map>
-void generate_MOS_layout(int L, int S, int mode, 
-                       std::map<Hex, int8_t>& paletteTier,
-                       std::vector<bool>& layout ) {
-  layout = generate_mode(generate_MOS_scale(L, S), mode);
-  // using the Hex struct as a sortable pair
-  // the X dimension = large steps, Y = small steps
-  // start with the mode after the selected one
-  // set notes in that mode to be the "black keys" (1)
-  // cycle through modes until back to the selected
-  // and that mode gets "white keys" (0)
-  // doing it in this order prevents having to check
-  // if the map entry is already full -- can naively
-  // overwrite safely
-  std::vector<bool> currMode = layout;
-  uint8_t modeCount = (L + S) / gcd(L,S);
-  Hex Zero(0,0);
-  Hex Lg(1,0);
-  Hex Sm(0,1);
-  Hex iH;
-  bool blackKey;
-  for (uint8_t m = 0; m < modeCount; ++m) {
-    mode_shift(currMode);
-    iH = Zero;
-    blackKey = (m != modeCount - 1);
-    for (uint8_t i = 0; i < S + L; ++i) {
-      paletteTier[iH] = blackKey;
-      iH = iH + (currMode[i] ? Lg : Sm);
-    }
-  }
-}
 
-void apply_MOS_palette( Hex    A_span, // X = lg, Y = sm
+void apply_MOS_layout ( Hex    A_span, // X = lg, Y = sm
                         Hex    B_span, // X = lg, Y = sm
-                        Hex    Enharm,
-                        const  std::map<Hex, int8_t>& tier) {
-  // find the largest lg and sm step stored in the palette map
-  // so you don't have to pass S and L by a value
-  int S = 0;
-  int L = 0;
-  for (const auto& [ls, t] : tier) {
-    L = (ls.x > L ? ls.x : L);
-    S = (ls.y > S ? ls.y : S);
-  }
+                        const  MOS_Scale& _mos,
+                        double period, int _mode) {
+  float smCents = period / _mos.Lg * _mos.ratio_f + _mos.Sm;
+  float lgCents = smCents * _mos.ratio_f;
   for (auto& n : hexBoard.btn) {
     if (!n.isBtn) continue;
     if (!n.isNote) continue; // for now assuming cmd btns are unchanged
     n.smallDegree = A_span.y * n.A_steps + B_span.y * n.B_steps;
     n.largeDegree = A_span.x * n.A_steps + B_span.x * n.B_steps;
-    // scale by octave
     n.scaleEquave = 0;
-    while ((n.largeDegree >= L) && (n.smallDegree >= S)) {
-      ++(n.scaleEquave);
-      n.largeDegree -= L;
-      n.smallDegree -= S;
-    }
-    while ((n.largeDegree < 0) || (n.smallDegree < 0)) {
-      --(n.scaleEquave);
-      n.largeDegree += L;
-      n.smallDegree += S;
-    }
-    // reduce to enharmonic equivalent, if you're in an EDO subset
-    if (Enharm.x && Enharm.y) {
-      while ((n.largeDegree > L) && (n.smallDegree <= S)) {
-        n.largeDegree -= Enharm.x;
-        n.smallDegree += Enharm.y;
+    if (_mos.rational) {
+      n.scaleDegree = n.largeDegree * _mos.ratio_num_s
+                    + n.smallDegree * _mos.ratio_den_L;
+      while (n.scaleDegree < 0) {
+        --n.scaleEquave;
+        n.smallDegree += _mos.Sm;
+        n.largeDegree += _mos.Lg;
+        n.scaleDegree += _mos.underlyingEDO;
       }
-      while ((n.largeDegree <= L) && (n.smallDegree > S)) {
-        n.largeDegree += Enharm.x;
-        n.smallDegree -= Enharm.y;
+      while (n.scaleDegree >= _mos.underlyingEDO) {
+        ++n.scaleEquave;
+        n.smallDegree -= _mos.Sm;
+        n.largeDegree -= _mos.Lg;
+        n.scaleDegree -= _mos.underlyingEDO;
       }
-    }
-    //
-    auto pt = tier.find({n.largeDegree, n.smallDegree});  
-    if (pt != tier.end()) {
-      n.paletteNum = tier.at({n.largeDegree, n.smallDegree});
-    } else {
       n.paletteNum = -1;
+      if (_mos.inMode_EDO_equiv[_mode][n.scaleDegree]) {
+        n.paletteNum = 0; // white key
+      } else {
+        for (uint i = 0; i < _mos.modeCt; ++i) {
+          if (_mos.inMode_EDO_equiv[(_mode + i) % _mos.modeCt][n.scaleDegree]) {
+            n.paletteNum = 1;
+          }
+        }
+      }
+    } else {
+      while ((n.smallDegree < 0) || (n.largeDegree < 0)) {
+        --n.scaleEquave;
+        n.smallDegree += _mos.Sm;
+        n.largeDegree += _mos.Lg;
+      }
+      while ((n.smallDegree >= _mos.Sm) && (n.largeDegree >= _mos.Lg)) {
+        ++n.scaleEquave;
+        n.smallDegree -= _mos.Sm;
+        n.largeDegree -= _mos.Lg;
+      }
+      n.paletteNum = -1;
+      if ((n.largeDegree <= _mos.Lg) && (n.smallDegree <= _mos.Sm)) {
+        if (_mos.inMode[_mode][n.largeDegree][n.smallDegree]) {
+          n.paletteNum = 0;
+        } else {
+          for (uint i = 0; i < _mos.modeCt; ++i) {
+            if (_mos.inMode[(_mode + i) % _mos.modeCt][n.largeDegree][n.smallDegree]) {
+              n.paletteNum = 1;
+            }
+          }
+        }
+      }
     }
+    n.midiPitch += period * n.scaleEquave / 100.0;
+    n.midiPitch += (smCents * n.smallDegree + lgCents * n.largeDegree) / 100.0;
   }
 }
 
-void apply_MOS_pitches(double period, int L, int S, double R) {
-  for (auto& n : hexBoard.btn) {
-    if (!n.isBtn) continue;
-    if (!n.isNote) continue; // for now assuming cmd btns are unchanged
-    n.midiPitch += period / 100.0 
-        * (n.scaleEquave + (n.largeDegree * R + n.smallDegree) / (L + S));
-  }
-}
+#include "color.h"
 
 bool generate_layout(hexBoard_Setting_Array& refS) {
   Hex anchorHex(refS[_anchorX].i, refS[_anchorY].i);
@@ -299,35 +365,61 @@ bool generate_layout(hexBoard_Setting_Array& refS) {
       break;
     }
     case _tuneSys_lg_sm: {
-      std::map<Hex, int8_t> palette;
-      std::vector<bool> MOS;
-      generate_MOS_layout(refS[_lgSteps].i, refS[_smSteps].i, 
-          refS[_modeLgSm].i, palette, MOS);
       Hex A_axis(refS[_lgStepA].i, refS[_smStepA].i);
       Hex B_axis(refS[_lgStepB].i, refS[_smStepB].i);
-      Hex Lg_Sm(refS[_lgToSmN].i, refS[_lgToSmD].i);
-      Hex Discard(0,0);
-      apply_MOS_palette(A_axis,B_axis,
-                  refS[_lgToSmND].b ? Lg_Sm : Discard, palette);
-      apply_MOS_pitches(equaveCents, refS[_lgSteps].i, refS[_smSteps].i,
-        refS[_lgToSmND].b ? refS[_lgToSmN].i / (double)refS[_lgToSmD].i
-                          : refS[_lgToSmR].d);
+      MOS_Scale MOS(refS[_lgSteps].i, refS[_smSteps].i);
+      if (refS[_lgToSmND].b) {
+        MOS.set_L_S_ratio(refS[_lgToSmN].i, refS[_lgToSmD].i);
+      } else {
+        MOS.set_L_S_ratio(refS[_lgToSmR].d);
+      }
+      MOS.determine_key_colors();
+      apply_MOS_layout(A_axis, B_axis, MOS, equaveCents, refS[_modeLgSm].i);
+      break;
     }
     case _tuneSys_just: {
-      float JIcentsA = intervalToCents(refS[_JInumA].d / refS[_JIdenA].d);
-      float JIcentsB = intervalToCents(refS[_JInumB].d / refS[_JIdenB].d);
+      float JIcentsA = intervalToCents((float)refS[_JInumA].i / (float)refS[_JIdenA].i);
+      float JIcentsB = intervalToCents((float)refS[_JInumB].i / (float)refS[_JIdenB].i);
       for (auto& n : hexBoard.btn) {
         if (!n.isBtn) continue;
         if (!n.isNote) continue; // for now assuming cmd btns are unchanged
-        n.midiPitch += JIcentsA * n.A_steps;
-        n.midiPitch += JIcentsB * n.B_steps;
+        n.midiPitch += JIcentsA * n.A_steps / 100.0;
+        n.midiPitch += JIcentsB * n.B_steps / 100.0;
+        n.paletteNum = 0;
       }
+      break;
     }
   }
   for (auto& n : hexBoard.btn) {
     n.frequency = MIDItoFreq(n.midiPitch);
-    if (n.pixel > 60) n.LEDcodeBase = 0x010000;
-    if (n.pixel < 50) n.LEDcodeBase = 0x000001;
+    HSV paletteColor;
+    switch (n.paletteNum) {
+      case 0: {
+        paletteColor.h = 0.0;
+        paletteColor.s = 0.0;
+        paletteColor.v = 0.4;
+        break; 
+      } // white key
+      case 1: {
+        paletteColor.h = 270.0;
+        paletteColor.s = 1.0;
+        paletteColor.v = 0.2;
+        break;
+      } // black key
+      case -1: {
+        paletteColor.h = 45.0;
+        paletteColor.s = 1.0;
+        paletteColor.v = 0.2; 
+        break; 
+      } // E#/Fb
+      default: {
+        paletteColor.h = 144.0 + 36.0 * n.paletteNum;
+        paletteColor.s = 0.5;
+        paletteColor.v = 0.2;
+        break;
+      }
+    }
+    n.LEDcodeBase = okhsv_to_neopixel_code(paletteColor);
   }
   // reflect transposition in frequencies
 

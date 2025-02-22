@@ -1,69 +1,106 @@
 #pragma once
 #include "OLED.h" // OLED graphics object
-#include <GEM_u8g2.h>           // library of code to create menu objects on the B&W display
+#include "GUI.h"
+#include <GEM_u8g2.h>   // library of code to create menu objects on the B&W display
 #include "config/enable-advanced-mode.h"
 GEM_u8g2 menu(u8g2);
 
+// expose the underlying numerical type linked to the menu item
 struct GEMItemPublic : public GEMItem {
   GEMItemPublic(const GEMItem& g) : GEMItem(g) {}
   byte getLinkedType() { return linkedType; }
 };
+/*
+ *  allow the GEMPage object to store the GUI context
+ *  and make custom constructors to streamline design.
+ *  OLED is 128 pixels wide.
+ *  Menu items are displayed in monospace font.
+ *  Maximum string size is 19 characters.
+ *  On each page you set characters aside for 
+ *  selectors (spinners, checkboxes, value entry)
+ *  This can be different between pages -- e.g.
+ *  7 characters for some pages, 8 for others.
+ *  The default layout can show 11 menu entries,
+ *  plus a "back" entry at the top (enter zero).
+ *  If you want to display the HUD panel below
+ *  then you can limit how many menu items are 
+ *  shown to e.g. 7 rows.
+ */
 struct GEMPagePublic : public GEMPage {
   int GUI_context;
+	std::string HUD_footer;
   GEMAppearance derived_appearance;
-  void initialize_appearance(byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_) {
+  void initialize_appearance(byte titleRows_, byte itemsPerScreen_, 
+	                           byte valueMargin_) {
     derived_appearance = {
       GEM_POINTER_ROW, 
-      menuItemsPerScreen_, 
+      itemsPerScreen_, 
       (byte)(_LG_FONT_HEIGHT + 2), 
       (byte)(4 + _SM_FONT_HEIGHT + (titleRows_ * (_LG_FONT_HEIGHT + 2))),
       (byte)(_OLED_WIDTH - _RIGHT_MARGIN - (valueMargin_ * _LG_FONT_WIDTH))
     };
     _appearance = &derived_appearance;
   }
-  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_)
-  : GEMPage(title_), GUI_context(GUI_context_) {
-    initialize_appearance(titleRows_, menuItemsPerScreen_, valueMargin_);
+  GEMPagePublic(const char* title_, std::string footer_, int GUI_context_,  
+	              byte titleRows_, byte itemsPerScreen_, byte valueMargin_)
+  : GEMPage(title_), GUI_context(GUI_context_), HUD_footer(footer_) {
+    initialize_appearance(titleRows_, itemsPerScreen_, valueMargin_);
   }
-  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_, GEMPage& parentMenuPage_)
-  : GEMPage(title_, parentMenuPage_), GUI_context(GUI_context_) {
-    initialize_appearance(titleRows_, menuItemsPerScreen_, valueMargin_);
+  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, 
+	              byte itemsPerScreen_, byte valueMargin_, GEMPage& parentPage_)
+  : GEMPage(title_, parentPage_), GUI_context(GUI_context_), HUD_footer("") {
+    initialize_appearance(titleRows_, itemsPerScreen_, valueMargin_);
   }
-  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, byte menuItemsPerScreen_, byte valueMargin_, void (*on_exit_)())
-  : GEMPage(title_, on_exit_), GUI_context(GUI_context_) {
-    initialize_appearance(titleRows_, menuItemsPerScreen_, valueMargin_);
+  GEMPagePublic(const char* title_, int GUI_context_, byte titleRows_, 
+	              byte itemsPerScreen_, byte valueMargin_, void (*on_exit_)())
+  : GEMPage(title_, on_exit_), GUI_context(GUI_context_), HUD_footer("") {
+    initialize_appearance(titleRows_, itemsPerScreen_, valueMargin_);
   }
 };
 
 void doNothing() {}
-GEMPagePublic pgNoMenu("",_show_HUD + _show_custom_msg, 0,0,0, doNothing);
-
-GEMPagePublic pgHome("Hexboard v1.1", _show_HUD, 0, 7, 0);
-GEMPagePublic pgShowMsg("",_show_custom_msg, 6, 1, 0, pgHome);
-
-GEMPagePublic pgLayout("Layout editor", _show_HUD, 0, 7, 0, pgHome);
-GEMPagePublic pgTuning("Tuning system parameters", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 6, pgLayout);
-GEMPagePublic pgGenerate("Select layout parameters", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 6, pgLayout);
-GEMPagePublic pgAnchor("Select root key and tuning", _show_pixel_ID, 1, GEM_ITEMS_COUNT_AUTO, 6, pgGenerate);
-
-GEMPagePublic pgPlayback("MIDI and synth settings", _show_HUD, 0, GEM_ITEMS_COUNT_AUTO, 3, pgHome);
-GEMPagePublic pgMIDI("MIDI settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 19, pgPlayback);
-GEMPagePublic pgMIDIout("MIDI out ports", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 3, pgMIDI);
-GEMPagePublic pgSynth("Synth settings", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 8, pgPlayback);
-
-GEMPagePublic pgHardware("Hardware settings", _show_HUD, 0, GEM_ITEMS_COUNT_AUTO, 0, pgHome);
-GEMPagePublic pgRotary("Rotary settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 5, pgHardware);
-GEMPagePublic pgCommand("Command key settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 5, pgHardware);
-GEMPagePublic pgOLED("OLED settings",   _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 5, pgHardware);
-
-GEMPagePublic pgSoftware("Software settings", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-
-GEMPagePublic pgSavePreset("Select slot to save in", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-
-GEMPagePublic pgLoadPreset("Select slot to load from", _hide_GUI, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-
-GEMPagePublic pgReboot("Power off options", _show_HUD, 0, GEM_ITEMS_COUNT_AUTO, 7, pgHome);
-GEMPagePublic pgEdit("Edit current layout...", _show_pixel_ID, 1, GEM_ITEMS_COUNT_AUTO, 7, pgLayout);
+GEMPagePublic pgNoMenu(
+  "Hexboard v1.1", "Long press knob: main menu", 
+	                   _show_HUD + _show_dashboard, 0, 0, 0);
+GEMPagePublic pgHome(
+  "Hexboard v1.1", "Long press knob: exit menu",  
+	                                     _show_HUD, 0, 7, 0);
+GEMPagePublic pgShowMsg(
+  "",                           _show_custom_msg, 6, 1, 0, pgHome);
+GEMPagePublic pgLayout(
+  "Layout editor",                     _show_HUD, 0, 7, 0, pgHome);
+GEMPagePublic pgTuning(
+  "Tuning system parameters",          _hide_GUI, 0, 0, 6, pgLayout);
+GEMPagePublic pgGenerate(
+  "Select layout parameters",          _hide_GUI, 0, 0, 6, pgLayout);
+GEMPagePublic pgAnchor(
+  "Select root key and tuning",   _show_pixel_ID, 1, 0, 6, pgGenerate);
+GEMPagePublic pgPlayback(
+  "MIDI and synth settings",           _show_HUD, 0, 0, 3, pgHome);
+GEMPagePublic pgMIDI(
+  "MIDI settings",                     _hide_GUI, 0, 0, 19, pgPlayback);
+GEMPagePublic pgMIDIout(
+  "MIDI out ports",                    _hide_GUI, 0, 0, 3, pgMIDI);
+GEMPagePublic pgSynth(
+  "Synth settings",                    _hide_GUI, 0, 0, 8, pgPlayback);
+GEMPagePublic pgHardware(
+	"Hardware settings",                 _show_HUD, 0, 0, 0, pgHome);
+GEMPagePublic pgRotary(
+  "Rotary settings",                   _hide_GUI, 0, 0, 5, pgHardware);
+GEMPagePublic pgCommand(
+  "Command key settings",              _hide_GUI, 0, 0, 5, pgHardware);
+GEMPagePublic pgOLED(
+  "OLED settings",                     _hide_GUI, 0, 0, 5, pgHardware);
+GEMPagePublic pgSoftware(
+  "Software settings",                 _hide_GUI, 0, 0, 7, pgHome);
+GEMPagePublic pgSavePreset(
+  "Select slot to save in",            _hide_GUI, 0, 0, 7, pgHome);
+GEMPagePublic pgLoadPreset(
+  "Select slot to load from",          _hide_GUI, 0, 0, 7, pgHome);
+GEMPagePublic pgReboot(
+  "Power off options",                 _show_HUD, 0, 0, 7, pgHome);
+GEMPagePublic pgEdit(
+  "Edit current layout...",       _show_pixel_ID, 1, 0, 7, pgLayout);
 
 GEMSelect dropdown_notes(128, (SelectOptionInt[]){
  {"C -1", 0},{"C#-1", 1},{"D -1", 2},{"Eb-1", 3}, {"E -1", 4},{"F -1", 5},
@@ -91,266 +128,138 @@ GEMSelect dropdown_notes(128, (SelectOptionInt[]){
 
 // Roland MT-32 mode (1987)
 GEMSelect dropdown_mt32(128, (SelectOptionInt[]){
-  {"Acoustic Piano 1",    1},
-  {"Acoustic Piano 2",    2},
-  {"Acoustic Piano 3",    3},
-  {"Electric Piano 1",    4},
-  {"Electric Piano 2",    5},
-  {"Electric Piano 3",    6},
-  {"Electric Piano 4",    7},
-  {"Honkytonk",           8},
-  {"Electric Organ 1",    9},
-  {"Electric Organ 2",   10},
-  {"Electric Organ 3",   11},
-  {"Electric Organ 4",   12},
-  {"Pipe Organ 1",       13},
-  {"Pipe Organ 2",       14},
-  {"Pipe Organ 3",       15},
-  {"Accordion",          16},
-  {"Harpsichord 1",      17},
-  {"Harpsichord 2",      18},
-  {"Harpsichord 3",      19},
-  {"Clavinet 1",         20},
-  {"Clavinet 2",         21},
-  {"Clavinet 3",         22},
-  {"Celesta 1",          23},
-  {"Celesta 2",          24},
-  {"Synth Brass 1",      25},
-  {"Synth Brass 2",      26},
-  {"Synth Brass 3",      27},
-  {"Synth Brass 4",      28},
-  {"Synth Bass 1",       29},
-  {"Synth Bass 2",       30},
-  {"Synth Bass 3",       31},
-  {"Synth Bass 4",       32},
-  {"Fantasy",            33},
-  {"Harmo Pan",          34},
-  {"Chorale",            35},
-  {"Glasses",            36},
-  {"Soundtrack",         37},
-  {"Atmosphere",         38},
-  {"Warm Bell",          39},
-  {"Funny Vox",          40},
-  {"Echo Bell",          41},
-  {"Ice Rain",           42},
-  {"Oboe 2001",          43},
-  {"Echo Pan",           44},
-  {"Doctor Solo",        45},
-  {"School Daze",        46},
-  {"Bellsinger",         47},
-  {"Square Wave",        48},
-  {"String Section 1",   49},
-  {"String Section 2",   50},
-  {"String Section 3",   51},
-  {"Pizzicato",          52},
-  {"Violin 1",           53},
-  {"Violin 2",           54},
-  {"Cello 1",            55},
-  {"Cello 2",            56},
-  {"Contrabass",         57},
-  {"Harp 1",             58},
-  {"Harp 2",             59},
-  {"Guitar 1",           60},
-  {"Guitar 2",           61},
-  {"Elec Gtr 1",         62},
-  {"Elec Gtr 2",         63},
-  {"Sitar",              64},
-  {"Acou Bass 1",        65},
-  {"Acou Bass 2",        66},
-  {"Elec Bass 1",        67},
-  {"Elec Bass 2",        68},
-  {"Slap Bass 1",        69},
-  {"Slap Bass 2",        70},
-  {"Fretless 1",         71},
-  {"Fretless 2",         72},
-  {"Flute 1",            73},
-  {"Flute 2",            74},
-  {"Piccolo 1",          75},
-  {"Piccolo 2",          76},
-  {"Recorder",           77},
-  {"Pan Pipes",          78},
-  {"Sax 1",              79},
-  {"Sax 2",              80},
-  {"Sax 3",              81},
-  {"Sax 4",              82},
-  {"Clarinet 1",         83},
-  {"Clarinet 2",         84},
-  {"Oboe",               85},
-  {"English Horn",       86},
-  {"Bassoon",            87},
-  {"Harmonica",          88},
-  {"Trumpet 1",          89},
-  {"Trumpet 2",          90},
-  {"Trombone 1",         91},
-  {"Trombone 2",         92},
-  {"French Horn 1",      93},
-  {"French Horn 2",      94},
-  {"Tuba",               95},
-  {"Brass Section 1",    96},
-  {"Brass Section 2",    97},
-  {"Vibe 1",             98},
-  {"Vibe 2",             99},
-  {"Synth Mallet",      100},
-  {"Windbell",          101},
-  {"Glock",             102},
-  {"Tube Bell",         103},
-  {"Xylophone",         104},
-  {"Marimba",           105},
-  {"Koto",              106},
-  {"Sho",               107},
-  {"Shakuhachi",        108},
-  {"Whistle 1",         109},
-  {"Whistle 2",         110},
-  {"Bottleblow",        111},
-  {"Breathpipe",        112},
-  {"Timpani",           113},
-  {"Melodic Tom",       114},
-  {"Deep Snare",        115},
-  {"Elec Perc 1",       116},
-  {"Elec Perc 2",       117},
-  {"Taiko",             118},
-  {"Taiko Rim",         119},
-  {"Cymbal",            120},
-  {"Castanets",         121},
-  {"Triangle",          122},
-  {"Orchestra Hit",     123},
-  {"Telephone",         124},
-  {"Bird Tweet",        125},
-  {"One Note Jam",      126},
-  {"Water Bell",        127},
-  {"Jungle Tune",       128}
+  {"Acoustic Piano 1",    1},  {"Acoustic Piano 2",    2}, 
+  {"Acoustic Piano 3",    3},  {"Electric Piano 1",    4},
+  {"Electric Piano 2",    5},  {"Electric Piano 3",    6},
+  {"Electric Piano 4",    7},  {"Honkytonk",           8},
+  {"Electric Organ 1",    9},  {"Electric Organ 2",   10},
+  {"Electric Organ 3",   11},  {"Electric Organ 4",   12},
+  {"Pipe Organ 1",       13},  {"Pipe Organ 2",       14},
+  {"Pipe Organ 3",       15},  {"Accordion",          16},
+  {"Harpsichord 1",      17},  {"Harpsichord 2",      18},
+  {"Harpsichord 3",      19},  {"Clavinet 1",         20},
+  {"Clavinet 2",         21},  {"Clavinet 3",         22},
+  {"Celesta 1",          23},  {"Celesta 2",          24},
+  {"Synth Brass 1",      25},  {"Synth Brass 2",      26},
+  {"Synth Brass 3",      27},  {"Synth Brass 4",      28},
+  {"Synth Bass 1",       29},  {"Synth Bass 2",       30},
+  {"Synth Bass 3",       31},  {"Synth Bass 4",       32},
+  {"Fantasy",            33},  {"Harmo Pan",          34},
+  {"Chorale",            35},  {"Glasses",            36},
+  {"Soundtrack",         37},  {"Atmosphere",         38},
+  {"Warm Bell",          39},  {"Funny Vox",          40},
+  {"Echo Bell",          41},  {"Ice Rain",           42},
+  {"Oboe 2001",          43},  {"Echo Pan",           44},
+  {"Doctor Solo",        45},  {"School Daze",        46},
+  {"Bellsinger",         47},  {"Square Wave",        48},
+  {"String Section 1",   49},  {"String Section 2",   50},
+  {"String Section 3",   51},  {"Pizzicato",          52},
+  {"Violin 1",           53},  {"Violin 2",           54},
+  {"Cello 1",            55},  {"Cello 2",            56},
+  {"Contrabass",         57},  {"Harp 1",             58},
+  {"Harp 2",             59},  {"Guitar 1",           60},
+  {"Guitar 2",           61},  {"Elec Gtr 1",         62},
+  {"Elec Gtr 2",         63},  {"Sitar",              64},
+  {"Acou Bass 1",        65},  {"Acou Bass 2",        66},
+  {"Elec Bass 1",        67},  {"Elec Bass 2",        68},
+  {"Slap Bass 1",        69},  {"Slap Bass 2",        70},
+  {"Fretless 1",         71},  {"Fretless 2",         72},
+  {"Flute 1",            73},  {"Flute 2",            74},
+  {"Piccolo 1",          75},  {"Piccolo 2",          76},
+  {"Recorder",           77},  {"Pan Pipes",          78},
+  {"Sax 1",              79},  {"Sax 2",              80},
+  {"Sax 3",              81},  {"Sax 4",              82},
+  {"Clarinet 1",         83},  {"Clarinet 2",         84},
+  {"Oboe",               85},  {"English Horn",       86},
+  {"Bassoon",            87},  {"Harmonica",          88},
+  {"Trumpet 1",          89},  {"Trumpet 2",          90},
+  {"Trombone 1",         91},  {"Trombone 2",         92},
+  {"French Horn 1",      93},  {"French Horn 2",      94},
+  {"Tuba",               95},  {"Brass Section 1",    96},
+  {"Brass Section 2",    97},  {"Vibe 1",             98},
+  {"Vibe 2",             99},  {"Synth Mallet",      100},
+  {"Windbell",          101},  {"Glock",             102},
+  {"Tube Bell",         103},  {"Xylophone",         104},
+  {"Marimba",           105},  {"Koto",              106},
+  {"Sho",               107},  {"Shakuhachi",        108},
+  {"Whistle 1",         109},  {"Whistle 2",         110},
+  {"Bottleblow",        111},  {"Breathpipe",        112},
+  {"Timpani",           113},  {"Melodic Tom",       114},
+  {"Deep Snare",        115},  {"Elec Perc 1",       116},
+  {"Elec Perc 2",       117},  {"Taiko",             118},
+  {"Taiko Rim",         119},  {"Cymbal",            120},
+  {"Castanets",         121},  {"Triangle",          122},
+  {"Orchestra Hit",     123},  {"Telephone",         124},
+  {"Bird Tweet",        125},  {"One Note Jam",      126},
+  {"Water Bell",        127},  {"Jungle Tune",       128}
 });
 
 // General MIDI 1 Patch List
 GEMSelect dropdown_gm(128, (SelectOptionInt[]){
-  {"Acoustic GrandPiano",  1},
-  {"BrightAcousticPiano",  2},
-  {"Electric GrandPianp",  3},
-  {"Honky-tonk Piano",     4},
-  {"Electric Piano 1",     5},
-  {"Electric Piano 2",     6},
-  {"Harpsichord",          7},
-  {"Clavi",                8},
-  {"Celesta",              9},
-  {"Glockenspiel",        10},
-  {"Music Box",           11},
-  {"Vibraphone",          12},
-  {"Marimba",             13},
-  {"Xylophone",           14},
-  {"Tubular Bells",       15},
-  {"Dulcimer",            16},
-  {"Drawbar Organ",       17},
-  {"Percussive Organ",    18},
-  {"Rock Organ",          19},
-  {"Church Organ",        20},
-  {"Reed Organ",          21},
-  {"Accordion",           22},
-  {"Harmonica",           23},
-  {"Tango Accordion",     24},
-  {"AcousticGuitarNylon", 25},
-  {"AcousticGuitarSteel", 26},
-  {"ElectricGuitar Jazz", 27},
-  {"ElectricGuitarClean", 28},
-  {"ElectricGuitarMuted", 29},
-  {"Overdrive Guitar",    30},
-  {"Distortion Guitar",   31},
-  {"Guitar harmonics",    32},
-  {"Acoustic Bass",       33},
-  {"ElectricBass Finger", 34},
-  {"El Bass (pick)",      35},
-  {"Fretless Bass",       36},
-  {"Slap Bass 1",         37},
-  {"Slap Bass 2",         38},
-  {"Synth Bass 1",        39},
-  {"Synth Bass 2",        40},
-  {"Violin",              41},
-  {"Viola",               42},
-  {"Cello",               43},
-  {"Contrabass",          44},
-  {"Tremolo Strings",     45},
-  {"Pizzicato Strings",   46},
-  {"Orchestral Harp",     47},
-  {"Timpani",             48},
-  {"String Ensemble 1",   49},
-  {"String Ensemble 2",   50},
-  {"Synth Strings 1",     51},
-  {"Synth Strings 2",     52},
-  {"Choir Aahs",          53},
-  {"Voice Oohs",          54},
-  {"Synth Voice",         55},
-  {"Orchestra Hit",       56},
-  {"Trumpet",             57},
-  {"Trombone",            58},
-  {"Tuba",                59},
-  {"Muted Trumpet",       60},
-  {"French Horn",         61},
-  {"Brass Section",       62},
-  {"Synth Brass 1",       63},
-  {"Synth Brass 2",       64},
-  {"Soprano Sax",         65},
-  {"Alto Sax",            66},
-  {"Tenor Sax",           67},
-  {"Baritone Sax",        68},
-  {"Oboe",                69},
-  {"English Horn",        70},
-  {"Bassoon",             71},
-  {"Clarinet",            72},
-  {"Piccolo",             73},
-  {"Flute",               74},
-  {"Recorder",            75},
-  {"Pan Flute",           76},
-  {"Blown Bottle",        77},
-  {"Shakuhachi",          78},
-  {"Whistle",             79},
-  {"Ocarina",             80},
-  {"Lead 1 (square)",     81},
-  {"Lead 2 (sawtooth)",   82},
-  {"Lead 3 (calliope)",   83},
-  {"Lead 4 (chiff)",      84},
-  {"Lead 5 (charang)",    85},
-  {"Lead 6 (voice)",      86},
-  {"Lead 7 (fifths)",     87},
-  {"Lead 8 (bass+lead)",  88},
-  {"Pad 1 (new age)",     89},
-  {"Pad 2 (warm)",        90},
-  {"Pad 3 (poly synth)",  91},
-  {"Pad 4 (choir)",       92},
-  {"Pad 5 (bowed)",       93},
-  {"Pad 6 (metallic)",    94},
-  {"Pad 7 (halo)",        95},
-  {"Pad 8 (sweep)",       96},
-  {"FX 1 (rain)",         97},
-  {"FX 2 (soundtrack)",   98},
-  {"FX 3 (crystal)",      99},
-  {"FX 4 (atmosphere)",  100},
-  {"FX 5 (brightness)",  101},
-  {"FX 6 (goblins)",     102},
-  {"FX 7 (echoes)",      103},
-  {"FX 8 (sci-fi)",      104},
-  {"Sitar",              105},
-  {"Banjo",              106},
-  {"Shamisen",           107},
-  {"Koto",               108},
-  {"Kalimba",            109},
-  {"Bag pipe",           110},
-  {"Fiddle",             111},
-  {"Shanai",             112},
-  {"Tinkle Bell",        113},
-  {"Agogo",              114},
-  {"Steel Drums",        115},
-  {"Woodblock",          116},
-  {"Taiko Drum",         117},
-  {"Melodic Tom",        118},
-  {"Synth Drum",         119},
-  {"Reverse Cymbal",     120},
-  {"Guitar Fret Noise",  121},
-  {"Breath Noise",       122},
-  {"Seashore",           123},
-  {"Bird Tweet",         124},
-  {"Telephone Ring",     125},
-  {"Helicopter",         126},
-  {"Applause",           127},
-  {"Gunshot",            128}
+  {"Acoustic GrandPiano",  1},  {"BrightAcousticPiano",  2},
+  {"Electric GrandPianp",  3},  {"Honky-tonk Piano",     4},
+  {"Electric Piano 1",     5},  {"Electric Piano 2",     6},
+  {"Harpsichord",          7},  {"Clavi",                8},
+  {"Celesta",              9},  {"Glockenspiel",        10},
+  {"Music Box",           11},  {"Vibraphone",          12},
+  {"Marimba",             13},  {"Xylophone",           14},
+  {"Tubular Bells",       15},  {"Dulcimer",            16},
+  {"Drawbar Organ",       17},  {"Percussive Organ",    18},
+  {"Rock Organ",          19},  {"Church Organ",        20},
+  {"Reed Organ",          21},  {"Accordion",           22},
+  {"Harmonica",           23},  {"Tango Accordion",     24},
+  {"AcousticGuitarNylon", 25},  {"AcousticGuitarSteel", 26},
+  {"ElectricGuitar Jazz", 27},  {"ElectricGuitarClean", 28},
+  {"ElectricGuitarMuted", 29},  {"Overdrive Guitar",    30},
+  {"Distortion Guitar",   31},  {"Guitar harmonics",    32},
+  {"Acoustic Bass",       33},  {"ElectricBass Finger", 34},
+  {"El Bass (pick)",      35},  {"Fretless Bass",       36},
+  {"Slap Bass 1",         37},  {"Slap Bass 2",         38},
+  {"Synth Bass 1",        39},  {"Synth Bass 2",        40},
+  {"Violin",              41},  {"Viola",               42},
+  {"Cello",               43},  {"Contrabass",          44},
+  {"Tremolo Strings",     45},  {"Pizzicato Strings",   46},
+  {"Orchestral Harp",     47},  {"Timpani",             48},
+  {"String Ensemble 1",   49},  {"String Ensemble 2",   50},
+  {"Synth Strings 1",     51},  {"Synth Strings 2",     52},
+  {"Choir Aahs",          53},  {"Voice Oohs",          54},
+  {"Synth Voice",         55},  {"Orchestra Hit",       56},
+  {"Trumpet",             57},  {"Trombone",            58},
+  {"Tuba",                59},  {"Muted Trumpet",       60},
+  {"French Horn",         61},  {"Brass Section",       62},
+  {"Synth Brass 1",       63},  {"Synth Brass 2",       64},
+  {"Soprano Sax",         65},  {"Alto Sax",            66},
+  {"Tenor Sax",           67},  {"Baritone Sax",        68},
+  {"Oboe",                69},  {"English Horn",        70},
+  {"Bassoon",             71},  {"Clarinet",            72},
+  {"Piccolo",             73},  {"Flute",               74},
+  {"Recorder",            75},  {"Pan Flute",           76},
+  {"Blown Bottle",        77},  {"Shakuhachi",          78},
+  {"Whistle",             79},  {"Ocarina",             80},
+  {"Lead 1 (square)",     81},  {"Lead 2 (sawtooth)",   82},
+  {"Lead 3 (calliope)",   83},  {"Lead 4 (chiff)",      84},
+  {"Lead 5 (charang)",    85},  {"Lead 6 (voice)",      86},
+  {"Lead 7 (fifths)",     87},  {"Lead 8 (bass+lead)",  88},
+  {"Pad 1 (new age)",     89},  {"Pad 2 (warm)",        90},
+  {"Pad 3 (poly synth)",  91},  {"Pad 4 (choir)",       92},
+  {"Pad 5 (bowed)",       93},  {"Pad 6 (metallic)",    94},
+  {"Pad 7 (halo)",        95},  {"Pad 8 (sweep)",       96},
+  {"FX 1 (rain)",         97},  {"FX 2 (soundtrack)",   98},
+  {"FX 3 (crystal)",      99},  {"FX 4 (atmosphere)",  100},
+  {"FX 5 (brightness)",  101},  {"FX 6 (goblins)",     102},
+  {"FX 7 (echoes)",      103},  {"FX 8 (sci-fi)",      104},
+  {"Sitar",              105},  {"Banjo",              106},
+  {"Shamisen",           107},  {"Koto",               108},
+  {"Kalimba",            109},  {"Bag pipe",           110},
+  {"Fiddle",             111},  {"Shanai",             112},
+  {"Tinkle Bell",        113},  {"Agogo",              114},
+  {"Steel Drums",        115},  {"Woodblock",          116},
+  {"Taiko Drum",         117},  {"Melodic Tom",        118},
+  {"Synth Drum",         119},  {"Reverse Cymbal",     120},
+  {"Guitar Fret Noise",  121},  {"Breath Noise",       122},
+  {"Seashore",           123},  {"Bird Tweet",         124},
+  {"Telephone Ring",     125},  {"Helicopter",         126},
+  {"Applause",           127},  {"Gunshot",            128}
 });
 
 GEMSelect dropdown_dir(6, (SelectOptionInt[]){
@@ -535,7 +444,6 @@ void showHide_generate() {
 
 enum {
   _run_routine_to_generate_layout = -1,
-
 };
 
 extern void menu_handler(int settingNumber);
@@ -746,10 +654,12 @@ void populate_menu_structure() {
     ;
 }
 
-extern void draw_GUI(int context);
-
 void query_GUI() {
-  draw_GUI(static_cast<GEMPagePublic*>(menu.getCurrentMenuPage())->GUI_context);
+	GEMPagePublic* thisPg = static_cast<GEMPagePublic*>
+													(menu.getCurrentMenuPage());
+  GUI.context = thisPg->GUI_context;
+  GUI.HUD_footer = thisPg->HUD_footer;
+	GUI.draw();
 }
 
 void menu_setup() {
@@ -760,6 +670,7 @@ void menu_setup() {
   menu.invertKeysDuringEdit(true);
 	menu.setDrawMenuCallback(query_GUI);
   menu.setMenuPageCurrent(pgNoMenu);
+  menu.drawMenu();
 }
 // give your preset a name then press ok or cancel
 // Save your current preset first? if yes, go to save preset then after execute then load.

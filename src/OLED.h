@@ -4,17 +4,6 @@
 #include <U8g2lib.h>
 #include "pico/time.h"
 
-// GUI context -- keep as integer-castable because
-// you can use bitwise comparisons to check
-// multiple contexts
-enum {
-  _hide_GUI = 0,
-  _show_HUD = 1,
-  _show_pixel_ID = 2,
-  _show_custom_msg = 4,
-  _show_dashboard = 8
-};
-
 // Create an instance of the U8g2 graphics library.
 U8G2_SH1107_SEEED_128X128_F_HW_I2C u8g2(U8G2_R2);
 
@@ -38,10 +27,6 @@ void connect_OLED_display(uint8_t SDA, uint8_t SCL) {
   u8g2.begin();
   u8g2.setBusClock(1000000);
   u8g2.setContrast(255);
-  u8g2.setFont(u8g2_font_inr57_mn);
-  u8g2.clearBuffer();
-  u8g2.drawStr(6,10,"HexBoard");
-  u8g2.sendBuffer();
   u8g2.setFont(u8g2_font_6x12_tr);
 }
 

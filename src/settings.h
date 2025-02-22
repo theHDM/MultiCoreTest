@@ -176,11 +176,11 @@ void load_factory_defaults_to(hexBoard_Setting_Array& refS, int version = 0) {
   }
   refS[_defaults].b = true;   // if you are loading factory defaults, set to true
   refS[_changed].b  = true;   // flag as true so that it will save at first oppt'y
-  refS[_debug].b    = true;   // send debug messages through Serial monitor
-  refS[_anchorX].i  = 0;      // hex at {0,0} is the root note
-  refS[_anchorY].i  = 0;      // hex at {0,0} is the root note
-  refS[_anchorN].i  = 69;     // default to A4
-  refS[_anchorC].d  = 0.0;    // default to A4=440Hz, no microtones
+  refS[_debug].b    = false;   // send debug messages through Serial monitor
+  refS[_anchorX].i  = -2;      // hex at {-2,0} is the root note
+  refS[_anchorY].i  = 0;      // hex at {-2,0} is the root note
+  refS[_anchorN].i  = 60;     // default to C4
+  refS[_anchorC].d  = 0.0;    // default to no microtones
   refS[_txposeS].i  = 0;      // default no transposing
   refS[_txposeC].d  = 100.0;  // shift by 100 cents each transpose
   refS[_axisA].i    = 3;      // axis A is left
@@ -189,7 +189,7 @@ void load_factory_defaults_to(hexBoard_Setting_Array& refS, int version = 0) {
   refS[_equaveC].d  = 1200.0; // 1200 cents = octave
   refS[_equaveN].i  = 2;      // 2/1 = octave
   refS[_equaveD].i  = 1;      // 2/1 = octave
-  refS[_tuneSys].i  = 0;      // Equal divisions
+  refS[_tuneSys].i  = _tuneSys_lg_sm;      // Equal divisions
   refS[_eqDivs].i   = 12;     // 12 steps
   refS[_eqStepA].i  = -2;     // one whole tone
   refS[_eqStepB].i  = 7;      // perfect fifth
@@ -222,7 +222,7 @@ void load_factory_defaults_to(hexBoard_Setting_Array& refS, int version = 0) {
   refS[_mdSpeed].i  = 8;
   refS[_pbSpeed].i  = 8; // scale by x128
   refS[_vlSpeed].i  = 8;		
-  refS[_rotInv].b   = (version >= 12 ? true : false);
+  refS[_rotInv].b   = !(version >= 12 ? true : false);
   refS[_rotDblCk].i = 500; // milliseconds
   refS[_rotLongP].i = 750; // milliseconds
   refS[_SStime].i   = 10; // seconds
@@ -237,9 +237,9 @@ void load_factory_defaults_to(hexBoard_Setting_Array& refS, int version = 0) {
   refS[_MIDIpc].i   = 1; // program chg 1 - 128
   refS[_MT32pc].i   = 1;
   refS[_synthTyp].i = _synthTyp_poly;
-  refS[_synthWav].i = _synthWav_hybrid;
-  refS[_synthEnv].i = _synthEnv_none;
+  refS[_synthWav].i = _synthWav_clarinet;
+  refS[_synthEnv].i = _synthEnv_slow;
   refS[_synthVol].i = 96;
-  refS[_synthBuz].b = true;
-  refS[_synthJac].b = (version >= 12);
+  refS[_synthBuz].b = false;
+  refS[_synthJac].b = true || (version >= 12);
 }

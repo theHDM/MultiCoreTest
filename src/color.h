@@ -21,9 +21,6 @@
 #include <cmath>
 #include <cfloat>
 
-namespace ok_color
-{
-
 struct Lab { float L; float a; float b; };
 struct LCH { float L; float C; float H; };
 struct RGB { float r; float g; float b; };
@@ -36,33 +33,25 @@ struct LC  { float L; float C; };
 // The maximum value for C in the triangle is then found as fmin(S*L, T*(1-L)), for a given L
 struct ST { float S; float T; };
 
-float clamp(float x, float min, float max)
-{
-	if (x < min)
-		return min;
-	if (x > max)
-		return max;
-
+float clamp(float x, float min, float max) {
+	if (x < min) return min;
+	if (x > max) return max;
 	return x;
 }
 
-float sgn(float x)
-{
+float sgn(float x) {
 	return (float)(0.f < x) - (float)(x < 0.f);
 }
 
-float srgb_transfer_function(float a)
-{
+float srgb_transfer_function(float a) {
 	return .0031308f >= a ? 12.92f * a : 1.055f * powf(a, .4166666666666667f) - .055f;
 }
 
-float srgb_transfer_function_inv(float a)
-{
+float srgb_transfer_function_inv(float a) {
 	return .04045f < a ? powf((a + .055f) / 1.055f, 2.4f) : a / 12.92f;
 }
 
-Lab linear_srgb_to_oklab(const RGB& c)
-{
+Lab linear_srgb_to_oklab(const RGB& c) {
 	float l = 0.4122214708f * c.r + 0.5363325363f * c.g + 0.0514459929f * c.b;
 	float m = 0.2119034982f * c.r + 0.6806995451f * c.g + 0.1073969566f * c.b;
 	float s = 0.0883024619f * c.r + 0.2817188376f * c.g + 0.6299787005f * c.b;
@@ -78,8 +67,7 @@ Lab linear_srgb_to_oklab(const RGB& c)
 	};
 }
 
-RGB oklab_to_linear_srgb(const Lab& c)
-{
+RGB oklab_to_linear_srgb(const Lab& c) {
 	float l_ = c.L + 0.3963377774f * c.a + 0.2158037573f * c.b;
 	float m_ = c.L - 0.1055613458f * c.a - 0.0638541728f * c.b;
 	float s_ = c.L - 0.0894841775f * c.a - 1.2914855480f * c.b;
@@ -98,27 +86,21 @@ RGB oklab_to_linear_srgb(const Lab& c)
 // Finds the maximum saturation possible for a given hue that fits in sRGB
 // Saturation here is defined as S = C/L
 // a and b must be normalized so a^2 + b^2 == 1
-float compute_max_saturation(float a, float b)
-{
+float compute_max_saturation(float a, float b) {
 	// Max saturation will be when one of r, g or b goes below zero.
 
 	// Select different coefficients depending on which component goes below zero first
 	float k0, k1, k2, k3, k4, wl, wm, ws;
 
-	if (-1.88170328f * a - 0.80936493f * b > 1)
-	{
+	       if (-1.88170328f * a - 0.80936493f * b > 1) {
 		// Red component
 		k0 = +1.19086277f; k1 = +1.76576728f; k2 = +0.59662641f; k3 = +0.75515197f; k4 = +0.56771245f;
 		wl = +4.0767416621f; wm = -3.3077115913f; ws = +0.2309699292f;
-	}
-	else if (1.81444104f * a - 1.19445276f * b > 1)
-	{
+	}	else if (1.81444104f * a - 1.19445276f * b > 1)  {
 		// Green component
 		k0 = +0.73956515f; k1 = -0.45954404f; k2 = +0.08285427f; k3 = +0.12541070f; k4 = +0.14503204f;
 		wl = -1.2684380046f; wm = +2.6097574011f; ws = -0.3413193965f;
-	}
-	else
-	{
+	}	else {
 		// Blue component
 		k0 = +1.35733652f; k1 = -0.00915799f; k2 = -1.15130210f; k3 = -0.50559606f; k4 = +0.00692167f;
 		wl = -0.0041960863f; wm = -0.7034186147f; ws = +1.7076147010f;
@@ -164,8 +146,7 @@ float compute_max_saturation(float a, float b)
 
 // finds L_cusp and C_cusp for a given hue
 // a and b must be normalized so a^2 + b^2 == 1
-LC find_cusp(float a, float b)
-{
+LC find_cusp(float a, float b) {
 	// First, find the maximum saturation (saturation S = C/L)
 	float S_cusp = compute_max_saturation(a, b);
 
@@ -181,23 +162,19 @@ LC find_cusp(float a, float b)
 // L = L0 * (1 - t) + t * L1;
 // C = t * C1;
 // a and b must be normalized so a^2 + b^2 == 1
-float find_gamut_intersection(float a, float b, float L1, float C1, float L0, LC cusp)
-{
+float find_gamut_intersection(
+    float a, float b, float L1, 
+    float C1, float L0, LC cusp
+){
 	// Find the intersection for upper and lower half seprately
 	float t;
-	if (((L1 - L0) * cusp.C - (cusp.L - L0) * C1) <= 0.f)
-	{
+	if (((L1 - L0) * cusp.C - (cusp.L - L0) * C1) <= 0.f) {
 		// Lower half
-
 		t = cusp.C * L0 / (C1 * cusp.L + cusp.C * (L0 - L1));
-	}
-	else
-	{
+	} else {
 		// Upper half
-
 		// First intersect with triangle
 		t = cusp.C * (L0 - 1.f) / (C1 * (cusp.L - 1.f) + cusp.C * (L0 - L1));
-
 		// Then one step Halley's method
 		{
 			float dL = L1 - L0;
@@ -210,7 +187,6 @@ float find_gamut_intersection(float a, float b, float L1, float C1, float L0, LC
 			float l_dt = dL + dC * k_l;
 			float m_dt = dL + dC * k_m;
 			float s_dt = dL + dC * k_s;
-
 
 			// If higher accuracy is required, 2 or 3 iterations of the following block can be used:
 			{
@@ -266,16 +242,14 @@ float find_gamut_intersection(float a, float b, float L1, float C1, float L0, LC
 	return t;
 }
 
-float find_gamut_intersection(float a, float b, float L1, float C1, float L0)
-{
+float find_gamut_intersection(float a, float b, float L1, float C1, float L0) {
 	// Find the cusp of the gamut triangle
 	LC cusp = find_cusp(a, b);
 
 	return find_gamut_intersection(a, b, L1, C1, L0, cusp);
 }
 
-RGB gamut_clip_preserve_chroma(const RGB& rgb)
-{
+RGB gamut_clip_preserve_chroma(const RGB& rgb) {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
 
@@ -296,8 +270,7 @@ RGB gamut_clip_preserve_chroma(const RGB& rgb)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_project_to_0_5(const RGB& rgb)
-{
+RGB gamut_clip_project_to_0_5(const RGB& rgb) {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
 
@@ -318,8 +291,7 @@ RGB gamut_clip_project_to_0_5(const RGB& rgb)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_project_to_L_cusp(const RGB& rgb)
-{
+RGB gamut_clip_project_to_L_cusp(const RGB& rgb) {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
 
@@ -344,8 +316,7 @@ RGB gamut_clip_project_to_L_cusp(const RGB& rgb)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_adaptive_L0_0_5(const RGB& rgb, float alpha = 0.05f)
-{
+RGB gamut_clip_adaptive_L0_0_5(const RGB& rgb, float alpha = 0.05f) {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
 
@@ -368,8 +339,7 @@ RGB gamut_clip_adaptive_L0_0_5(const RGB& rgb, float alpha = 0.05f)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-RGB gamut_clip_adaptive_L0_L_cusp(const RGB& rgb, float alpha = 0.05f)
-{
+RGB gamut_clip_adaptive_L0_L_cusp(const RGB& rgb, float alpha = 0.05f) {
 	if (rgb.r < 1 && rgb.g < 1 && rgb.b < 1 && rgb.r > 0 && rgb.g > 0 && rgb.b > 0)
 		return rgb;
 
@@ -397,24 +367,21 @@ RGB gamut_clip_adaptive_L0_L_cusp(const RGB& rgb, float alpha = 0.05f)
 	return oklab_to_linear_srgb({ L_clipped, C_clipped * a_, C_clipped * b_ });
 }
 
-float toe(float x)
-{
+float toe(float x) {
 	constexpr float k_1 = 0.206f;
 	constexpr float k_2 = 0.03f;
 	constexpr float k_3 = (1.f + k_1) / (1.f + k_2);
 	return 0.5f * (k_3 * x - k_1 + sqrtf((k_3 * x - k_1) * (k_3 * x - k_1) + 4 * k_2 * k_3 * x));
 }
 
-float toe_inv(float x)
-{
+float toe_inv(float x) {
 	constexpr float k_1 = 0.206f;
 	constexpr float k_2 = 0.03f;
 	constexpr float k_3 = (1.f + k_1) / (1.f + k_2);
 	return (x * x + k_1 * x) / (k_3 * (x + k_2));
 }
 
-ST to_ST(LC cusp)
-{
+ST to_ST(LC cusp) {
 	float L = cusp.L;
 	float C = cusp.C;
 	return { C / L, C / (1 - L) };
@@ -423,8 +390,7 @@ ST to_ST(LC cusp)
 // Returns a smooth approximation of the location of the cusp
 // This polynomial was created by an optimization process
 // It has been designed so that S_mid < S_max and T_mid < T_max
-ST get_ST_mid(float a_, float b_)
-{
+ST get_ST_mid(float a_, float b_) {
 	float S = 0.11516993f + 1.f / (
 		+7.44778970f + 4.15901240f * b_
 		+ a_ * (-2.19557347f + 1.75198401f * b_
@@ -445,8 +411,8 @@ ST get_ST_mid(float a_, float b_)
 }
 
 struct Cs { float C_0; float C_mid; float C_max; };
-Cs get_Cs(float L, float a_, float b_)
-{
+
+Cs get_Cs(float L, float a_, float b_) {
 	LC cusp = find_cusp(a_, b_);
 
 	float C_max = find_gamut_intersection(a_, b_, L, 1, L, cusp);
@@ -478,8 +444,7 @@ Cs get_Cs(float L, float a_, float b_)
 	return { C_0, C_mid, C_max };
 }
 
-Lab okhsv_to_oklab(const HSV& hsv)
-{
+Lab okhsv_to_oklab(const HSV& hsv) {
   float h = hsv.h;
 	float s = hsv.s;
 	float v = clamp(hsv.v, 0.000001f, 1.f);
@@ -520,8 +485,7 @@ Lab okhsv_to_oklab(const HSV& hsv)
 	return { L, C * a_, C * b_ };
 }
 
-HSV oklab_to_okhsv(const Lab& lab)
-{
+HSV oklab_to_okhsv(const Lab& lab) {
   float C = sqrtf(lab.a * lab.a + lab.b * lab.b);
 	float a_ = lab.a / C;
 	float b_ = lab.b / C;
@@ -563,8 +527,7 @@ HSV oklab_to_okhsv(const Lab& lab)
 	return { h, s, v };
 }
 
-Lab oklch_to_oklab(const LCH& lch)
-{
+Lab oklch_to_oklab(const LCH& lch) {
   return {
     lch.L,
     lch.C * cosf(radians(lch.H)),
@@ -572,16 +535,14 @@ Lab oklch_to_oklab(const LCH& lch)
   };
 }
 
-uint32_t linear_srgb_to_neopixel_code(const RGB& rgb) 
-{
+uint32_t linear_srgb_to_neopixel_code(const RGB& rgb)  {
   return ((uint8_t)(255.0 * clamp(rgb.r,0.0,1.0)) << 16)
        | ((uint8_t)(255.0 * clamp(rgb.g,0.0,1.0)) << 8)
        |  (uint8_t)(255.0 * clamp(rgb.b,0.0,1.0));
 }
 
 // if color choice is #rrggbb
-uint32_t srgb_to_neopixel_code(const RGB& rgb)
-{
+uint32_t srgb_to_neopixel_code(const RGB& rgb) {
   return linear_srgb_to_neopixel_code({
 		srgb_transfer_function_inv(rgb.r),
 		srgb_transfer_function_inv(rgb.g),
@@ -590,8 +551,7 @@ uint32_t srgb_to_neopixel_code(const RGB& rgb)
 }
 
 // if color choice is perceptual hue/sat/val
-uint32_t okhsv_to_neopixel_code(const HSV& hsv)
-{
+uint32_t okhsv_to_neopixel_code(const HSV& hsv) {
 	return  linear_srgb_to_neopixel_code(
             oklab_to_linear_srgb(
               okhsv_to_oklab(
@@ -602,8 +562,7 @@ uint32_t okhsv_to_neopixel_code(const HSV& hsv)
 }
 
 // if color choice is perceptual light / chroma / hue
-uint32_t oklch_to_neopixel_code(const LCH& lch)
-{
+uint32_t oklch_to_neopixel_code(const LCH& lch) {
   return  linear_srgb_to_neopixel_code(
             oklab_to_linear_srgb(
               oklch_to_oklab(
@@ -612,5 +571,3 @@ uint32_t oklch_to_neopixel_code(const LCH& lch)
             )
   );
 }
-
-} // namespace ok_color

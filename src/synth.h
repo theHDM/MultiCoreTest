@@ -137,6 +137,10 @@ struct Synth_Voice {
   }
 };
 
+const uint8_t energizeBits   = 2;
+const uint8_t deEnergizeBits = 3;
+const uint8_t rampUpCurveBits = 6;
+
 struct hexBoard_Synth_Object {
   bool active;
   std::array<Synth_Voice, synth_polyphony_limit> voice;
@@ -208,14 +212,16 @@ struct hexBoard_Synth_Object {
       }
       mixLevels >>= 25 - audio_bits;
       mixLevels += neutral_level;
-      if (baseline_level < neutral_level) {
-        ++baseline_level;
-        mixLevels *= baseline_level;
+      if ((baseline_level >> rampUpCurveBits) < neutral_level) {
+        // ramp up voltage smoothly from zero
+        baseline_level += (1u << energizeBits);
+        mixLevels *= (baseline_level >> rampUpCurveBits);
         mixLevels /= neutral_level;
       }
     } else {
-      if (baseline_level) --baseline_level;
-        mixLevels = baseline_level;
+      // if silent, ramp down voltage slowly to zero
+      if (baseline_level) baseline_level -= (1u << deEnergizeBits);
+        mixLevels = (baseline_level >> rampUpCurveBits);
     }
     ownership = 1;
     for (size_t i = 0; i < pins.size(); ++i) {

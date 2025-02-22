@@ -208,6 +208,25 @@ void interpret_key_msg(Key_Msg& msg) {
       hardwired_switch_handler(b->pixel);
       return;
     }
+
+    debug.add("note ");
+    debug.add_num(b->midiPitch);
+    debug.add("tier ");
+    debug.add_num(b->paletteNum);
+    debug.add("A ");
+    debug.add_num(b->A_steps);
+    debug.add("B ");
+    debug.add_num(b->B_steps);
+    debug.add("octave ");
+    debug.add_num(b->scaleEquave);
+    debug.add("step ");
+    debug.add_num(b->scaleDegree);
+    debug.add(" / ");
+    debug.add_num(b->largeDegree);
+    debug.add("L,");
+    debug.add_num(b->smallDegree);
+    debug.add("s\n");
+
     switch (app_state) {
       case App_state::play_mode:
       case App_state::menu_nav: {
@@ -371,7 +390,7 @@ bool on_OLED_frame_refresh(repeating_timer *t) {
       break;
     case App_state::play_mode:
       u8g2.clearBuffer();
-      draw_GUI(_show_HUD + _show_dashboard);
+      GUI.draw();
       u8g2.sendBuffer();
       break;
     default:
@@ -382,8 +401,8 @@ bool on_OLED_frame_refresh(repeating_timer *t) {
 
 struct repeating_timer polling_timer_debug;
 bool on_debug_refresh(repeating_timer *t) {
-  debug.add_num(successes);
-  debug.add("\n");
+  //debug.add_num(successes);
+  //debug.add("\n");
   debug.send();
   return true;
 }
@@ -400,22 +419,22 @@ void setup() {
   mount_file_system();  
   //if (!load_settings(settings, settingFileName)) { // attempt to load saved settings, and if not,  
   //}  
-  calibrate_rotary_from_settings(settings);
+  apply_settings_to_objects(settings);
   init_MIDI();
   initialize_synth_channel_queue();
   menu_setup();
   add_repeating_timer_ms(
-    -LED_poll_interval_mS, 
+    LED_poll_interval_mS, 
     on_LED_frame_refresh, NULL, 
     &polling_timer_LED
   );
   add_repeating_timer_ms(
-    -OLED_poll_interval_mS,
+    OLED_poll_interval_mS,
     on_OLED_frame_refresh, NULL, 
     &polling_timer_OLED
   );
   add_repeating_timer_ms(
-    -1'000,
+    1'000,
     on_debug_refresh, NULL, 
     &polling_timer_debug
   );

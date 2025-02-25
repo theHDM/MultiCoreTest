@@ -6,7 +6,6 @@
 // this is useful for serializing (converting to bytes for file storage)
 // and for processing menu callbacks efficiently (you can cast as integer)
 // while also being very legible (settings[_settingName] returns correct array member)
-
 // if you change the list of settings,
 // make sure also to change:
 // * defaults in this file
@@ -15,74 +14,33 @@
 // * applying settings in main
 
 enum {
-  _defaults, // is this the factory default set?
-  _changed,  // has this changed since last save?
-  _debug,    // send debug messages through serial port?
-  _anchorX,  // X coordinate of hex assigned to the root
-  _anchorY,  // Y coordinate of hex assigned to the root
-  _anchorN, // MIDI note closest to anchor note
-  _anchorC, // +/- cents
-  _txposeS,   // # of transpose steps
-  _txposeC,  // +/- cents, size of each transpose step
-  _axisA,    // one of 6 directions
-  _axisB,    // one of 6 directions
-  _equaveJI, //
-  _equaveC,  //
-  _equaveN,  //
-  _equaveD,  //
-  _tuneSys,  //
-  _eqDivs,   //
-  _eqStepA,  //
-  _eqStepB,  //
-  _lgSteps,  //
-  _smSteps,  //
-  _lgStepA,  //
-  _smStepA,  //
-  _lgStepB,  //
-  _smStepB,  //
-  _lgToSmND, // rational number?
-  _lgToSmR,  //
-  _lgToSmN,  //
-  _lgToSmD,  //
-  _modeLgSm, //
-  _JInumA,   //
-  _JIdenA,   //
-  _JInumB,   //
-  _JIdenB,   //
-  _scaleLck, //
-  _animFPS,  //
-  _palette,  //
-  _animType, //
-  _globlBrt, //
-  _hueLoop,  //
-  _tglWheel, //
-  _whlMode,  //
-  _mdSticky, //
-  _pbSticky, //
-  _vlSticky, //
-  _mdSpeed,  //
-  _pbSpeed,  //
-  _vlSpeed,  //
-  _rotInv,   //
-  _rotDblCk, //
-  _rotLongP, //
+  // meta fields
+  _defaults,_changed, _debug,  
+  // master tuning / key center data
+  _anchorX, _anchorY, _anchorN, _anchorC, _anchorF,
+  _txposeS, _txposeC,
+  _axisA,   _axisB,
+  _equaveD, _equaveC,
+  _tuneSys,
+  _eqDivs,  _eqStepA, _eqStepB, _eqScale, _eqChrom,
+  _lgSteps, _smSteps, _lgStepA, _smStepA, _lgStepB, _smStepB,
+  _lgToSmOp,_lgToSmND,_lgToSmR, _lgToSmN, _lgToSmD, _modeLgSm,
+  _JInumA,  _JIdenA,  _JInumB,  _JIdenB,  
+  _scaleLck,_animFPS, _palette, _animType,_globlBrt,_hueLoop,
+  _hue_0,   _sat_0,   _val_0,
+  _hue_1,   _sat_1,   _val_1,   _hue_n1,  _sat_n1,  _val_n1,
+  _hue_2,   _sat_2,   _val_2,   _hue_n2,  _sat_n2,  _val_n2,
+  _hue_3,   _sat_3,   _val_3,   _hue_n3,  _sat_n3,  _val_n3,
+  _tglWheel,_whlMode, 
+  _mdSticky,_pbSticky,_vlSticky, 
+  _mdSpeed, _pbSpeed, _vlSpeed,  
+  _rotInv,  _rotDblCk,_rotLongP, 
   _SStime,   //
-  _MIDImode, //
-  _MIDIusb,  //
-  _MIDIjack, //
-  _MPEzoneC, //
-  _MPEzoneL, //
-  _MPEzoneR, //
-  _MPEpb,    //
-  _MIDIorMT, //
-  _MIDIpc,   //
-  _MT32pc,   //
-  _synthTyp, //
-  _synthWav, //
-  _synthEnv, //
-  _synthVol, //
-  _synthBuz, //
-  _synthJac, //
+  _MIDImode,_MIDIusb, _MIDIjack,
+  _MPEzoneC,_MPEzoneL,_MPEzoneR,_MPEpb,    //
+  _MIDIorMT,_MIDIpc,  _MT32pc,
+  _synthTyp,_synthWav,_synthEnv, //
+  _synthVol,_synthBuz,_synthJac, //
   _settingSize // the largest index plus one 
 };
 
@@ -177,28 +135,36 @@ void load_factory_defaults_to(hexBoard_Setting_Array& refS, int version = 0) {
   refS[_defaults].b = true;   // if you are loading factory defaults, set to true
   refS[_changed].b  = true;   // flag as true so that it will save at first oppt'y
   refS[_debug].b    = false;   // send debug messages through Serial monitor
+
   refS[_anchorX].i  = -2;      // hex at {-2,0} is the root note
   refS[_anchorY].i  = 0;      // hex at {-2,0} is the root note
   refS[_anchorN].i  = 60;     // default to C4
-  refS[_anchorC].d  = 0.0;    // default to no microtones
+  refS[_anchorC].i  = 0;      // default to no microtones
+  refS[_anchorF].i  = 0;      // default to no microtones
+
   refS[_txposeS].i  = 0;      // default no transposing
   refS[_txposeC].d  = 100.0;  // shift by 100 cents each transpose
   refS[_axisA].i    = 3;      // axis A is left
   refS[_axisB].i    = 1;      // axis B is up-right
-  refS[_equaveJI].b = false;  // false = use cents value
+  refS[_equaveD].i  = 0;      // dropdown
   refS[_equaveC].d  = 1200.0; // 1200 cents = octave
-  refS[_equaveN].i  = 2;      // 2/1 = octave
-  refS[_equaveD].i  = 1;      // 2/1 = octave
   refS[_tuneSys].i  = _tuneSys_lg_sm;      // Equal divisions
   refS[_eqDivs].i   = 12;     // 12 steps
   refS[_eqStepA].i  = -2;     // one whole tone
   refS[_eqStepB].i  = 7;      // perfect fifth
+
+  refS[_eqScale].i  = 0;      // major
+  refS[_eqChrom].i  = 0;      // 
+
+
+
   refS[_lgSteps].i  = 5;      // five whole tones
   refS[_smSteps].i  = 2;      // two semitones
   refS[_lgStepA].i  = -1;     // one whole tone 
   refS[_smStepA].i  = 0;      // no semitones
   refS[_lgStepB].i  = 3;      // three whole tones
   refS[_smStepB].i  = 1;      // and one semitone
+  refS[_lgToSmOp].i = 0x21;   // whole tone is 2x the semitone
   refS[_lgToSmND].b = true;   // 
   refS[_lgToSmR].d  = 2.0;    // whole tone is 2x the semitone
   refS[_lgToSmN].i  = 2;      // whole tone is 2x the semitone

@@ -5,7 +5,11 @@ enum class App_state {  // OLED             LED         Audio        Keys       
   setup,                // splash/status    off         off          off        off
   play_mode,            // full GUI         musical     active       play       control, hold for menu
   menu_nav,             // menu             musical     active       play       menu, hold at home page to escape
-  edit_mode,            // menu->edit mode  edit mode   off          selection  menu
+
+  hex_picker,
+  color_picker,
+  sequencer,      // TBD
+
   calibrate,            // TBD
   data_mgmt,            // TBD
   crash,                // display error    off         off          off        TBD
@@ -147,7 +151,7 @@ void apply_settings_to_objects(hexBoard_Setting_Array& refS) {
 }
 void menu_handler(int settingNumber) {
   switch (settingNumber) {
-    case _run_routine_to_generate_layout:
+    case _on_generate_layout:
       generate_layout(settings);
       menu.setMenuPageCurrent(pgHome);
       break;
@@ -276,12 +280,36 @@ void interpret_key_msg(Key_Msg& msg) {
         v->note_on();
         break;
       }
+      case App_state::hex_picker: {
+        // what hex did you select
+        // send that info to settings
+        // change menu page
+        // change app state back
+        break;
+      }
+      case App_state::color_picker: {
+        // hard coding for now; TO-DO make this less hard-coded lol
+        
+
+
+        // if you are in palette mode
+        // cmd buttons change the palette ID (0 thru 6)
+        // keys 1 thru 9 change the hue angle by +/- 120, 24, 6, 2, 0 , -2, ...
+        // remaining keys select the sat and value (see okHSV picker)
+        // remember to adjust for global brightness!
+
+        break;
+      }
       default: break;
     }
   } else if (b->check_and_reset_just_released()) {
     switch (app_state) {
       case App_state::play_mode:
-      case App_state::menu_nav: {
+      case App_state::menu_nav:
+      case App_state::hex_picker:
+      case App_state::color_picker: {
+        // note-off, also allow in other modes so that
+        // notes don't remain stuch on state transition
         if (!b->synthChPlaying) break;
         Synth_Voice *v = &synth.voice[(b->synthChPlaying) - 1];
         v->note_off();
@@ -299,13 +327,17 @@ void interpret_key_msg(Key_Msg& msg) {
       default: break;
     }
   } else if (b->pressure) {
-    //
+    // if you have pressure sensitive buttons
+    // you can add code here to send
+    // expression data to MIDI and/or synth.
   }
 }
 
 void process_play_mode_knob(Rotary_Action& A) {
   switch (A) {
     // TO-DO -- route other actions to various commands
+    // e.g. single click cycles transpose,
+    // volume, preset change, instrument chg, etc.
     case Rotary_Action::long_press:
       menu.setMenuPageCurrent(pgHome);
       app_state = App_state::menu_nav;
@@ -371,9 +403,32 @@ void process_menu_input(Rotary_Action& A) {
 
 struct repeating_timer polling_timer_LED;
 bool on_LED_frame_refresh(repeating_timer *t) {
-  for (auto& b : hexBoard.btn) {
-    if (!b.isBtn) continue;
-    strip.setPixelColor(b.pixel, b.LEDcodeBase);
+  switch (app_state) {
+    case App_state::hex_picker: {
+      // some sort of animation, or
+      // highlight the previous one
+      // and the rest blank
+      break;
+    }
+    case App_state::color_picker: {
+      // if you are in palette mode
+      // cmd buttons are selected colors 0 thru 6
+      // keys 1 thru 9 are full S/V of hue angle by +/- 120, 24, 6, 2, 0 , -2, ...
+      // remaining keys select the sat and value (see okHSV picker)
+      // hue = selected
+      // sat = function of b.coord.x
+      // val = function of b.coord.y
+      // remember to adjust for global brightness!
+      break;
+    }
+    case App_state::menu_nav:
+    case App_state::play_mode: {
+      for (auto& b : hexBoard.btn) {
+        if (!b.isBtn) continue;
+        strip.setPixelColor(b.pixel, b.LEDcodeBase);
+      }
+      break;
+    }
   }
   strip.show();
   return true;
@@ -383,7 +438,6 @@ struct repeating_timer polling_timer_OLED;
 bool on_OLED_frame_refresh(repeating_timer *t) {
   switch (app_state) {
     case App_state::menu_nav:
-    case App_state::edit_mode:
       if (screenupdate) break;
       menu.drawMenu(); // when menu is active, call GUI update through menu refresh
       oled_screensaver.jiggle();

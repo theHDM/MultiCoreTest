@@ -328,10 +328,7 @@ bool generate_layout(hexBoard_Setting_Array& refS) {
   }
   // express the root pitch as MIDI (note + cents/100)
   double anchorPitch = (double)refS[_anchorN].i + refS[_anchorC].d / 100.0;  
-  double equaveCents = (refS[_equaveJI].b
-      ? intervalToCents(refS[_equaveN].d / refS[_equaveD].d)
-                      : refS[_equaveC].d);
-  if (equaveCents <= 0.0) {
+  if (refS[_equaveC].d <= 0.0) {
     return false; // 3) equave must be valid
   }
   for (auto& n : hexBoard.btn) {
@@ -360,7 +357,7 @@ bool generate_layout(hexBoard_Setting_Array& refS) {
       break;
     }
     case _tuneSys_equal: {
-      generate_and_apply_EDO_layout(equaveCents, refS[_eqDivs].i, 
+      generate_and_apply_EDO_layout(refS[_equaveC].d, refS[_eqDivs].i, 
         refS[_eqStepA].i, refS[_eqStepB].i);
       break;
     }
@@ -374,7 +371,7 @@ bool generate_layout(hexBoard_Setting_Array& refS) {
         MOS.set_L_S_ratio(refS[_lgToSmR].d);
       }
       MOS.determine_key_colors();
-      apply_MOS_layout(A_axis, B_axis, MOS, equaveCents, refS[_modeLgSm].i);
+      apply_MOS_layout(A_axis, B_axis, MOS, refS[_equaveC].d, refS[_modeLgSm].i);
       break;
     }
     case _tuneSys_just: {

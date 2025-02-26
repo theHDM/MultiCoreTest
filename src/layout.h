@@ -394,28 +394,29 @@ bool generate_layout(hexBoard_Setting_Array& refS) {
       case 0: {
         paletteColor.h = 0.0;
         paletteColor.s = 0.0;
-        paletteColor.v = 0.4;
+        paletteColor.v = 1.0;
         break; 
       } // white key
       case 1: {
         paletteColor.h = 270.0;
         paletteColor.s = 1.0;
-        paletteColor.v = 0.2;
+        paletteColor.v = 0.5;
         break;
       } // black key
       case -1: {
         paletteColor.h = 45.0;
         paletteColor.s = 1.0;
-        paletteColor.v = 0.2; 
+        paletteColor.v = 0.5; 
         break; 
       } // E#/Fb
       default: {
         paletteColor.h = 144.0 + 36.0 * n.paletteNum;
         paletteColor.s = 0.5;
-        paletteColor.v = 0.2;
+        paletteColor.v = 0.5;
         break;
       }
     }
+    paletteColor.v *= refS[_globlBrt].i / 255.0;
     n.LEDcodeBase = okhsv_to_neopixel_code(paletteColor);
   }
   // reflect transposition in frequencies
